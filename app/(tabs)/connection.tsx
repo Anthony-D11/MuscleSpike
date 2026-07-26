@@ -1,8 +1,8 @@
 import { useBle } from '@/contexts/BleContext';
-import { useModel } from '@/contexts/ModelContext';
+import { useModel } from '@/contexts/ServerContext';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -16,20 +16,10 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export default function IntegratedScannerScreen() {
   const { connectedDevice, isScanning, scannedDevices, connectionError, startScan, connectToDevice, disconnect } = useBle();
-  const isFocused = useIsFocused();
-  const [serverStatus, changeServerStatus] = useState<string>('Offline');
-  const { checkServerConnection } = useModel();
-  const verifyServer = async () => {
-    changeServerStatus('Checking...');
-    try {
-      const isOnline = await checkServerConnection();
-      changeServerStatus(isOnline ? 'Online' : 'Offline');
-    } catch (error) {
-      changeServerStatus('Offline'); 
-    }
-  };
+  const { isServerReachable, checkServerConnection } = useModel();
+  
   useEffect(() => {
-    verifyServer();
+    checkServerConnection();
   }, []);
 
   return (
@@ -46,7 +36,7 @@ export default function IntegratedScannerScreen() {
           {/* TOP STATUS BAR */}
           <TouchableOpacity 
             onPress={() => {
-                verifyServer();
+                checkServerConnection();
               }
             }
             style={styles.statusCard}>
@@ -61,8 +51,8 @@ export default function IntegratedScannerScreen() {
             <View style={[styles.statusSection, { alignItems: 'flex-end' }]}>
               <Text style={styles.statusLabel}>SERVER STATUS</Text>
               <View style={styles.statusRow}>
-                <Ionicons name="cloud-done-outline" size={16} color="#10B981" />
-                <Text style={styles.statusValueGreen}> {serverStatus}</Text>
+                <Ionicons name="cloud-done-outline" size={16} color={isServerReachable ? "#10B981" : "#ba1a1a"} />
+                <Text style={isServerReachable ?  styles.statusValueGreen : styles.statusValueRed}> {isServerReachable ? "Online" : "Offline"}</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -215,6 +205,7 @@ const styles = StyleSheet.create({
   greenDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981', marginRight: 6 },
   statusValueDark: { fontSize: 13, fontWeight: '700', color: '#1E293B' },
   statusValueGreen: { fontSize: 13, fontWeight: '700', color: '#10B981' },
+  statusValueRed: { fontSize: 13, fontWeight: '700', color: '#ba1a1a' },
   radarContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 40 },
   radarRingOuter: { width: 220, height: 220, borderRadius: 110, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
   radarRingInner: { width: 150, height: 150, borderRadius: 75, backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#CBD5E1' },
@@ -240,7 +231,7 @@ const styles = StyleSheet.create({
   
   // Troubleshooting & Empty States
   emptyText: { color: '#64748B', fontSize: 14, textAlign: 'center', marginVertical: 20 },
-  troubleshootingGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32 },
+  troubleshootingGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 62 },
   troubleCard: { flex: 1, backgroundColor: '#EBF3FA', borderRadius: 12, padding: 16, marginHorizontal: 4 },
   troubleTitle: { fontSize: 14, fontWeight: 'bold', color: '#0F172A', marginBottom: 6 },
   troubleText: { fontSize: 12, color: '#475569', lineHeight: 18 },

@@ -61,7 +61,7 @@ export const BleProvider = ({ children }: { children: React.ReactNode }) => {
 
     setIsScanning(true);
     setConnectionError(null);
-    setScannedDevices([]);
+    setScannedDevices(connectedDevice ? [connectedDevice] : []);
 
     bleManager.startDeviceScan(null, null, async (error, device) => {
       if (error) {
@@ -104,7 +104,6 @@ export const BleProvider = ({ children }: { children: React.ReactNode }) => {
       }
       await connected.discoverAllServicesAndCharacteristics();
       
-      // --- 1. OVERRIDE THE FIRMWARE SLEEP TIMER ---
       console.log('Sending Never-Sleep override...');
       const sleepBytes = [0x09, 0x01, 0x01];
       const sleepBase64 = Buffer.from(sleepBytes).toString('base64');
@@ -148,7 +147,7 @@ export const BleProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }
   };
-  
+
 
   return (
     <BleContext.Provider value={{ connectedDevice, isScanning, scannedDevices, connectionError, startScan, connectToDevice, disconnect }}>

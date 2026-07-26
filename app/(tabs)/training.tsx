@@ -1,5 +1,5 @@
 import { useBle } from '@/contexts/BleContext';
-import { useModel } from '@/contexts/ModelContext';
+import { useModel } from '@/contexts/ServerContext';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { Buffer } from 'buffer';
@@ -34,7 +34,7 @@ export default function RecordingScreen() {
   const isRecordingRef = useRef(false);
   const dataBuffer = useRef<number[][]>([]);
   const activeSubscriptions = useRef<any[]>([]);
-  const { trainAndInstallModel } = useModel();
+  const { uploadEMGData, trainAndInstallModel } = useModel();
   
   useEffect(() => {
     if (!connectedDevice || !isFocused) return;
@@ -115,7 +115,7 @@ export default function RecordingScreen() {
 
   const completeCaptureStep = () => {
     isRecordingRef.current = false;
-        saveBufferToCSV();
+    saveBufferToCSV();
     if (gestureId < GESTURES.length - 1) {
       setGestureId(prev => prev + 1);
       setStatus('IDLE');
@@ -149,59 +149,20 @@ export default function RecordingScreen() {
   };
 
   const handleServerUpload = async () => {
-    setIsUploading(true);
     try {
-      const internalDir = Paths.document;
-      const contents = internalDir.list();
-      
-      const formData = new FormData();
-      let fileCount = 0;
-      for (const item of contents) {
-        if (item.name && item.name.endsWith('_emg.csv')) {
-          
-          formData.append('files', {
-            uri: item.uri,
-            name: item.name,
-            type: 'text/csv',
-          } as any);
-          
-          fileCount++;
-        }
-      }
-
-      if (fileCount === 0) {
-        Alert.alert("No Data", "No CSV files found in storage.");
-        setIsUploading(false);
-        return;
-      }
-      
-      // Replace with your actual Python server IP/Endpoint
-      const response = await fetch('http://10.0.0.55:5000/upload', {
-        method: 'POST',
-        body: formData,
-        headers: { 'Accept': 'application/json' },
-      });
-      
-      if (response.ok) {
-        Alert.alert("Success", `${fileCount} files uploaded to server successfully!`);
-        setIsUploading(false);
-        setIsTraining(true);
-        try {
-          await trainAndInstallModel();
-        } catch (e) {
-          console.error("Failed to write model.js:", e);
-          throw e;
-        } finally {
-          setIsTraining(false);
-        }
-      } else {
-        Alert.alert("Upload Failed", "Server responded with an error.");
-      }
+      setIsUploading(true);
+      await uploadEMGData();
+      Alert.alert("Success", `Data files uploaded to server successfully!`);
+      setIsUploading(false);
+      setIsTraining(true);
+      await trainAndInstallModel();
+      setIsTraining(false);
     } catch (e) {
       console.error("Upload error:", e);
       Alert.alert("Upload Error", "Could not reach the server.");
     } finally {
       setIsUploading(false);
+      setIsTraining(false);
     }
   };
 

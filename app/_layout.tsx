@@ -3,7 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
-import { ModelProvider } from '@/contexts/ModelContext';
+import { ServerProvider } from '@/contexts/ServerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { BleProvider } from '../contexts/BleContext';
 
@@ -17,12 +17,12 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <BleProvider>
-        <ModelProvider>
+        <ServerProvider>
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
           </Stack>
-        </ModelProvider>
+        </ServerProvider>
         <StatusBar style="auto" />
       </BleProvider>
     </ThemeProvider>

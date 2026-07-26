@@ -1,6 +1,6 @@
 //import { EmgPath } from '@/components/emg-path';
 import { useBle } from '@/contexts/BleContext';
-import { useModel } from '@/contexts/ModelContext';
+import { useModel } from '@/contexts/ServerContext';
 import { ExtractFeatures } from '@/utils/FeatureExtractor';
 import RingBuffer from '@/utils/RingBuffer';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -19,7 +19,7 @@ const { width } = Dimensions.get('window');
 const GRAPH_WIDTH = width - 64; // Account for margins
 const CARD_HEIGHT = 80; // Total height of each channel row
 const GRAPH_HEIGHT = 40; // Height of the actual squiggly line
-const DATA_BUFFER_SIZE = 100;
+const DATA_BUFFER_SIZE = 400;
 const STRIDE = 20;
 const WINDOW_SIZE = 100; 
 const GESTURES = ['No Movement', 'Hand Open', 'Hand Close', 'Wrist Extension', 'Wrist Flexion'];
@@ -81,22 +81,11 @@ export default function DashboardScreen() {
   const samplesSinceLastPredict = useRef(0);
   const isFocused = useIsFocused();
   const activeSubscriptions = useRef<any[]>([]);
-  const { predictLive, isModelLoaded } = useModel();
+  const { liveModel, isModelLoaded, isServerReachable, checkServerConnection } = useModel();
 
-  const [serverStatus, changeServerStatus] = useState<string>('Offline');
-    const { checkServerConnection } = useModel();
-    const verifyServer = async () => {
-      changeServerStatus('Checking...');
-      try {
-        const isOnline = await checkServerConnection();
-        changeServerStatus(isOnline ? 'Online' : 'Offline');
-      } catch (error) {
-        changeServerStatus('Offline'); 
-      }
-    };
-    useEffect(() => {
-      verifyServer();
-    }, []);
+  useEffect(() => {
+    checkServerConnection();
+  }, [isFocused]);
 
   const pushBleDataToGraph = (batchedEmgArrays: number[][] ) => {
     'worklet'; 
@@ -151,24 +140,24 @@ export default function DashboardScreen() {
                   rawBytes.readInt8(8), rawBytes.readInt8(9), rawBytes.readInt8(10), rawBytes.readInt8(11),
                   rawBytes.readInt8(12), rawBytes.readInt8(13), rawBytes.readInt8(14), rawBytes.readInt8(15)
                 ]);
-              }
-              packetBatch.push([
-                rawBytes.readInt8(0), rawBytes.readInt8(1), rawBytes.readInt8(2), rawBytes.readInt8(3),
-                rawBytes.readInt8(4), rawBytes.readInt8(5), rawBytes.readInt8(6), rawBytes.readInt8(7)
-              ]);
-              packetBatch.push([
-                rawBytes.readInt8(8), rawBytes.readInt8(9), rawBytes.readInt8(10), rawBytes.readInt8(11),
-                rawBytes.readInt8(12), rawBytes.readInt8(13), rawBytes.readInt8(14), rawBytes.readInt8(15)
-              ]);
-              if (packetBatch.length >= 4) {
-                runOnUI(pushBleDataToGraph)([...packetBatch]);
-                packetBatch = [];
-              }
-              samplesSinceLastPredict.current += 2;
+                packetBatch.push([
+                  rawBytes.readInt8(0), rawBytes.readInt8(1), rawBytes.readInt8(2), rawBytes.readInt8(3),
+                  rawBytes.readInt8(4), rawBytes.readInt8(5), rawBytes.readInt8(6), rawBytes.readInt8(7)
+                ]);
+                packetBatch.push([
+                  rawBytes.readInt8(8), rawBytes.readInt8(9), rawBytes.readInt8(10), rawBytes.readInt8(11),
+                  rawBytes.readInt8(12), rawBytes.readInt8(13), rawBytes.readInt8(14), rawBytes.readInt8(15)
+                ]);
+                if (packetBatch.length >= 4) {
+                  runOnUI(pushBleDataToGraph)([...packetBatch]);
+                  packetBatch = [];
+                }
+                samplesSinceLastPredict.current += 2;
 
-              if (liveBuffer.current.isFull && samplesSinceLastPredict.current >= STRIDE) {
-                samplesSinceLastPredict.current = 0;
-                executeModelInference();
+                if (liveBuffer.current.isFull && samplesSinceLastPredict.current >= STRIDE) {
+                  samplesSinceLastPredict.current = 0;
+                  executeModelInference();
+                }
               }
 
             }
@@ -191,12 +180,12 @@ export default function DashboardScreen() {
   }, [connectedDevice, isFocused]);
 
   const executeModelInference = () => {
-    if (!isModelLoaded || !predictLive) return;
+    if (!isModelLoaded || !liveModel) return;
 
     const featureVector = ExtractFeatures(liveBuffer.current.getOrdered());
 
     try {
-      const rawOutput = predictLive(featureVector); 
+      const rawOutput = liveModel(featureVector); 
 
       if (Array.isArray(rawOutput)) {
         const predictedClassIndex = rawOutput.indexOf(Math.max(...rawOutput));
@@ -225,7 +214,10 @@ export default function DashboardScreen() {
             {/* Bluetooth Card */}
             <View style={styles.statusCard}>
               <View style={styles.statusIndicatorContainer}>
-                <View style={styles.indicatorLine} />
+                <View style={[
+                  styles.indicatorLine,
+                  connectedDevice !== null ? {backgroundColor: '#10B981'} : {backgroundColor: '#ba1a1a'}
+                ]} />
               </View>
               <View style={styles.statusTextContainer}>
                 <Text style={styles.statusLabel}>BLUETOOTH</Text>
@@ -236,11 +228,14 @@ export default function DashboardScreen() {
             {/* Server Card */}
             <View style={styles.statusCard}>
               <View style={styles.statusIndicatorContainer}>
-                <View style={styles.indicatorDot} />
+                <View style={[
+                  styles.indicatorDot,
+                  isServerReachable ? {backgroundColor: '#10B981'} : {backgroundColor: '#ba1a1a'}
+                ]} />
               </View>
               <View style={styles.statusTextContainer}>
                 <Text style={styles.statusLabel}>SERVER</Text>
-                <Text style={styles.statusValue}>{serverStatus}</Text>
+                <Text style={styles.statusValue}>{isServerReachable ? "Online" : "Offline"}</Text>
               </View>
               <Ionicons name="cloud-done-outline" size={20} color="#475569" />
             </View>
@@ -334,7 +329,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F1F5F9',
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
@@ -353,26 +348,24 @@ const styles = StyleSheet.create({
   indicatorLine: {
     width: 3,
     height: 12,
-    backgroundColor: '#10B981',
     borderRadius: 2,
   },
   indicatorDot: {
     width: 8,
     height: 8,
-    backgroundColor: '#10B981',
     borderRadius: 4,
   },
   statusTextContainer: {
     flex: 1,
   },
   statusLabel: {
-    fontSize: 8,
+    fontSize: 10,
     fontWeight: '700',
     color: '#475569',
     letterSpacing: 0.5,
   },
   statusValue: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
     color: '#0F172A',
   },
@@ -427,7 +420,7 @@ const styles = StyleSheet.create({
   telemetryContainer: {
     position: 'relative',
     minHeight: (80 + 12) * 8,
-    paddingBottom: 20
+    paddingBottom: 50
   },
   cardContainer: {
     height: 80,
