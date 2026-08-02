@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-const GESTURES = ['No Movement', 'Hand Open', 'Hand Close', 'Wrist Extension', 'Wrist Flexion'];
+const GESTURES = ['No Movement', 'Hand Open', 'Hand Close', 'Supination', 'Pronation'];
 const MAX_TRIALS = 3;
 const RECORD_DURATION_SEC = 5;
 
@@ -243,9 +243,22 @@ export default function RecordingScreen() {
                   <Text style={[styles.actionButtonText, {marginLeft: 10}]}>Recording...</Text>
                 </View>
               )}
+              
             </View>
+            
           )}
         </View>
+        <TouchableOpacity 
+                style={[styles.uploadButton, (isUploading || isTraining) && styles.uploadButtonDisabled]} 
+                onPress={handleServerUpload}
+              >
+                {isUploading || isTraining ? <ActivityIndicator color="#FFF" /> : (
+                  <>
+                    <Ionicons name="cloud-upload-outline" size={20} color="#FFF" style={{marginRight: 8}} />
+                    <Text style={styles.uploadButtonText}>Forward Data to Server</Text>
+                  </>
+                )}
+              </TouchableOpacity>
       </SafeAreaView>
     </SafeAreaProvider>
   );

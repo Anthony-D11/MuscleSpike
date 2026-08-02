@@ -22,7 +22,7 @@ const GRAPH_HEIGHT = 40; // Height of the actual squiggly line
 const DATA_BUFFER_SIZE = 400;
 const STRIDE = 20;
 const WINDOW_SIZE = 100; 
-const GESTURES = ['No Movement', 'Hand Open', 'Hand Close', 'Wrist Extension', 'Wrist Flexion'];
+const GESTURES = ['No Movement', 'Hand Open', 'Hand Close', 'Supination', 'Pronation'];
 
 const EmgPath = ({ data, writeIndex, xOffset, yOffset }: { data: any, writeIndex: any, xOffset: number, yOffset: number }) => {
   const path = useDerivedValue(() => {

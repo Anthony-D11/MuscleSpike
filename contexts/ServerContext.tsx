@@ -19,8 +19,8 @@ export const ServerProvider = ({ children }: { children: React.ReactNode }) => {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [isServerReachable, setIsServerReachable] = useState(false);
 
-  const baseServerUrl = "https://musclespikeserver.onrender.com";
-
+  //const baseServerUrl = "https://musclespikeserver.onrender.com";
+  const baseServerUrl = "http://10.0.0.35:5000";
 
   useEffect(() => {
     loadModelFromDisk();
@@ -45,7 +45,7 @@ export const ServerProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const checkServerConnection = async () => {
-    const response = await apiCall(baseServerUrl + "/ping", {method: "GET"});
+    const response = await apiCall<null>(baseServerUrl + "/ping", {method: "GET"});
     if (!response.error && response.status === 200) {
       setIsServerReachable(true);
     }
@@ -80,10 +80,10 @@ export const ServerProvider = ({ children }: { children: React.ReactNode }) => {
         throw new Error("No EMG data files found");
       }
 
-      const response = await apiCall<string>(baseServerUrl + "/upload", {
+      const response = await apiCall<{files: string[]; count: number}>(baseServerUrl + "/upload", {
         method: "POST",
         body: formData,
-        headers: {'Accept': 'application/json'}
+        timeoutMs: 15000,
       });
       if (response.error || !response.data) {
         throw new Error(response.error);
@@ -98,15 +98,14 @@ export const ServerProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       console.log("Fetching new model from server...");
       
-      const response = await apiCall<string>(baseServerUrl + "/train", {
-        method: "POST",
-        headers: {'Accept': 'application/json'}
+      const response = await apiCall<{ model: string }>(baseServerUrl + "/train", {
+        method: "GET",
+        timeoutMs: 30000,
       });
       if (response.error || !response.data) {
         throw new Error(response.error);
       }
-
-      const modelInJS = response.data;
+      const modelInJS = response.data.model;
       const modelFile = new File(Paths.document, 'local_model.js');
       modelFile.create({ overwrite: true });
       modelFile.write(modelInJS);

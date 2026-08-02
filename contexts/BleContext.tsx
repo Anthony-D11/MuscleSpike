@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { PermissionsAndroid, Platform } from 'react-native';
-import { BleManager, ConnectionPriority, Device } from 'react-native-ble-plx';
+import { BleManager, ConnectionPriority, Device, State } from 'react-native-ble-plx';
 
 const bleManager = new BleManager();
 
@@ -29,6 +29,22 @@ export const BleProvider = ({ children }: { children: React.ReactNode }) => {
   const [isScanning, setIsScanning] = useState(false);
   const [scannedDevices, setScannedDevices] = useState<Device[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stateSubscription = bleManager.onStateChange((state) => {
+      if (state === State.PoweredOff) {
+        console.log("Bluetooth was turned off by the user.");
+        
+        setConnectedDevice(null);
+        
+      }
+    }, true); 
+
+    return () => {
+      // Cleanup to prevent memory leaks
+      stateSubscription.remove();
+    };
+  }, []);
 
   const startScan = async () => {
     if (isScanning) return;
@@ -94,6 +110,7 @@ export const BleProvider = ({ children }: { children: React.ReactNode }) => {
       console.log(`Attempting to connect to device: ${device.name || device.id}`);
       const connected = await device.connect({ autoConnect: false });
       console.log(`Connected to device: ${connected.name || connected.id}`);
+
       if (Platform.OS === 'android') {
         try{
           await connected.requestMTU(512); 
@@ -128,8 +145,15 @@ export const BleProvider = ({ children }: { children: React.ReactNode }) => {
       );
       
       setConnectedDevice(connected);
+
+      bleManager.onDeviceDisconnected(device.id, (error, disconnectedDevice) => {
+        console.log(`Device ${disconnectedDevice?.id} disconnected`);
+        if (error) console.error("Unexpected device disconnection: ", error);
+        setConnectedDevice(null);
+      });
     } catch (e) {
       console.error("Connection failed", e);
+      setConnectedDevice(null);
     }
   };
 
