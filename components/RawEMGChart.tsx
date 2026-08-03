@@ -4,8 +4,8 @@ import { useDerivedValue } from "react-native-reanimated";
 
 
 const { width } = Dimensions.get('window');
-const GRAPH_WIDTH = width - 80;
-const GRAPH_HEIGHT = 40;
+const GRAPH_WIDTH = width - 70;
+const CHANNEL_HEIGHT = 50;
 
 const EmgPath = ({ data, writeIndex, xOffset, yOffset }: { data: any, writeIndex: any, xOffset: number, yOffset: number }) => {
   const path = useDerivedValue(() => {
@@ -20,7 +20,7 @@ const EmgPath = ({ data, writeIndex, xOffset, yOffset }: { data: any, writeIndex
     const xStep = GRAPH_WIDTH / (length - 1);
     
     const getY = (val: number) => {
-      const normalizedY = (GRAPH_HEIGHT / 2) - ((val * GRAPH_HEIGHT) / 2);
+      const normalizedY = (CHANNEL_HEIGHT / 2) - ((val * CHANNEL_HEIGHT) / 2);
       return normalizedY + yOffset; 
     };
 
@@ -69,13 +69,13 @@ export default function RawEMGChart({ channels, writeIndices, activeChannels }: 
           tempArray[index] = (index === 0 ? 0 : tempArray[index - 1]) + 1;
           // Calculate exactly where on the Y-axis this line should be drawn
           // Margin top + (Index * (Card Height + Margin Bottom)) + Header Offset
-          const yOffset = 9 + (tempArray[index] - 1) * (GRAPH_HEIGHT + 12) + 30; 
+          const yOffset = 45 + (tempArray[index] - 1) * (CHANNEL_HEIGHT + 12); 
           
           return (
             <Group key={`group-${index}`} >
               <Text
                 x={5}
-                y={yOffset + GRAPH_HEIGHT / 2 + 5}
+                y={yOffset + CHANNEL_HEIGHT / 2 + 5}
                 text={`CH ${index + 1}`}
                 color="#64748B"
                 font={font}

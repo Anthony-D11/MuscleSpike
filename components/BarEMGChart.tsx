@@ -42,7 +42,7 @@ export default function BarEMGChart ({ mavValues, activeChannels }: { mavValues:
   const PAD_RIGHT = 15;
 
   const { width } = Dimensions.get('window');
-  const GRAPH_WIDTH = width - 80;
+  const GRAPH_WIDTH = width - 60;
   const GRAPH_HEIGHT = 250;
   
   const tempArray = Array.from({ length: 8 }, (_, i) => 0);
@@ -87,7 +87,7 @@ export default function BarEMGChart ({ mavValues, activeChannels }: { mavValues:
           {yLabels.map((val, i) => (
             <SkiaText
               key={`y-label-${i}`}
-              x={5}
+              x={PAD_LEFT - 5 - font.measureText(val.label).width}
               y={val.y + 4} 
               text={val.label}
               font={font}
@@ -147,11 +147,3 @@ export default function BarEMGChart ({ mavValues, activeChannels }: { mavValues:
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-});

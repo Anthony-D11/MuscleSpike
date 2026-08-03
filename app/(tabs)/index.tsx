@@ -9,18 +9,15 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { Buffer } from 'buffer';
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnUI } from 'react-native-worklets';
 
 if (typeof global.Buffer === 'undefined') {
   global.Buffer = Buffer;
 }
-const { width } = Dimensions.get('window');
-const GRAPH_WIDTH = width - 64; // Account for margins
-const CARD_HEIGHT = 80; // Total height of each channel row
-const GRAPH_HEIGHT = 40; // Height of the actual squiggly line
+
 const DATA_BUFFER_SIZE = 400;
 const STRIDE = 20;
 const WINDOW_SIZE = 100; 
@@ -28,7 +25,7 @@ const GESTURES = ['No Movement', 'Hand Open', 'Hand Close', 'Supination', 'Prona
 
 
 export default function DashboardScreen() {
-
+  
   const { connectedDevice } = useBle();
     
   const channels = Array.from({ length: 8 }).map(() => useSharedValue(new Float32Array(DATA_BUFFER_SIZE)));
@@ -42,7 +39,7 @@ export default function DashboardScreen() {
   const { liveModel, isModelLoaded, isServerReachable, checkServerConnection } = useModel();
   const mavValues = useSharedValue([0, 0, 0, 0, 0, 0, 0, 0]);
 
-  const [isDialogVisible, setIsDialogVisible] = useState(false);
+  const [isSettingDialogVisible, setIsSettingDialogVisible] = useState(false);
   const [chartType, setChartType] = useState<'radial' | 'raw' | 'bars'>('bars');
   const [activeChannels, setActiveChannels] = useState<boolean[]>(Array(8).fill(true));
 
@@ -62,7 +59,9 @@ export default function DashboardScreen() {
         const currentIndex = writeIndex.value;
         
         const normalizedValue = emgArray[i] / 128.0; 
-
+        if (emgArray[i] > 100) {
+          console.log(emgArray[i], normalizedValue);
+        }
         const absoluteValue = Math.abs(normalizedValue);
         currentMavs[i] = (0.08 * absoluteValue) + ((1 - 0.08) * currentMavs[i]);
 
@@ -164,6 +163,7 @@ export default function DashboardScreen() {
       console.error("Math execution crashed:", e);
     }
   };
+
   const toggleChannel = (index: number) => {
     setActiveChannels(prev => {
       const newChannels = [...prev];
@@ -172,153 +172,166 @@ export default function DashboardScreen() {
     });
   };
 
+  const renderChart = () => {
+    switch (chartType) {
+      case 'radial':
+        return <RadialEMGChart mavValues={mavValues} activeChannels={activeChannels} />;
+      case 'raw':
+        return <RawEMGChart channels={channels} writeIndices={writeIndices} activeChannels={activeChannels} />;
+      case 'bars':
+        return <BarEMGChart mavValues={mavValues} activeChannels={activeChannels} />;
+      default:
+        return null;
+    }
+  }
+
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <StatusBar barStyle="light-content" backgroundColor="#121212" />
-          {/* Header Section */}
-          <View style={styles.headerContainer}>
-            <View style={styles.headerLeft}>
-              <MaterialCommunityIcons name="antenna" size={24} color="#1E3A8A" />
-              <Text style={styles.headerTitle}>Muscle Spike</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <ScrollView 
+        style={styles.scrollContainer} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <StatusBar barStyle="light-content" backgroundColor="#121212" />
+        {/* Header Section */}
+        <View style={styles.headerContainer}>
+          <View style={styles.headerLeft}>
+            <MaterialCommunityIcons name="antenna" size={24} color="#1E3A8A" />
+            <Text style={styles.headerTitle}>Muscle Spike</Text>
+          </View>
+        </View>
+        {/* Status Cards Section */}
+        <View style={styles.statusRow}>
+          {/* Bluetooth Card */}
+          <View style={styles.statusCard}>
+            <View style={styles.statusIndicatorContainer}>
+              <View style={[
+                styles.indicatorLine,
+                connectedDevice !== null ? {backgroundColor: '#10B981'} : {backgroundColor: '#ba1a1a'}
+              ]} />
+            </View>
+            <View style={styles.statusTextContainer}>
+              <Text style={styles.statusLabel}>BLUETOOTH</Text>
+              <Text style={styles.statusValue}>{connectedDevice !== null ? 'Connected' : 'Disconnected'}</Text>
+            </View>
+            <Ionicons name="bluetooth" size={20} color="#475569" />
+          </View>
+          {/* Server Card */}
+          <View style={styles.statusCard}>
+            <View style={styles.statusIndicatorContainer}>
+              <View style={[
+                styles.indicatorDot,
+                isServerReachable ? {backgroundColor: '#10B981'} : {backgroundColor: '#ba1a1a'}
+              ]} />
+            </View>
+            <View style={styles.statusTextContainer}>
+              <Text style={styles.statusLabel}>SERVER</Text>
+              <Text style={styles.statusValue}>{isServerReachable ? "Online" : "Offline"}</Text>
+            </View>
+            <Ionicons name="cloud-done-outline" size={20} color="#475569" />
+          </View>
+        </View>
+        {/* Prediction Section */}
+        <View style={styles.contentSection}>
+          <Text style={styles.title}>Current Gesture:</Text>
+          <Text style={styles.subtitle}>{currentPrediction}</Text>
+        </View>
+        {/* Container for the cards and the overlaying Canvas */}
+        <View style={styles.telemetryContainer}>
+          <View style={styles.cardContainer}>
+            <View style={styles.cardHeader}>
+              <TouchableOpacity style={styles.settingsButton} onPress={() => setIsSettingDialogVisible(true)}>
+                <Ionicons name="settings-outline" size={25} color="black" />
+              </TouchableOpacity>
+              {/* <TouchableOpacity style={styles.settingsButton}>
+                <Ionicons name="resize-outline" size={25} color="black" />
+              </TouchableOpacity> */}
             </View>
           </View>
-          {/* Status Cards Section */}
-          <View style={styles.statusRow}>
-            {/* Bluetooth Card */}
-            <View style={styles.statusCard}>
-              <View style={styles.statusIndicatorContainer}>
-                <View style={[
-                  styles.indicatorLine,
-                  connectedDevice !== null ? {backgroundColor: '#10B981'} : {backgroundColor: '#ba1a1a'}
-                ]} />
-              </View>
-              <View style={styles.statusTextContainer}>
-                <Text style={styles.statusLabel}>BLUETOOTH</Text>
-                <Text style={styles.statusValue}>{connectedDevice !== null ? 'Connected' : 'Disconnected'}</Text>
-              </View>
-              <Ionicons name="bluetooth" size={20} color="#475569" />
-            </View>
-            {/* Server Card */}
-            <View style={styles.statusCard}>
-              <View style={styles.statusIndicatorContainer}>
-                <View style={[
-                  styles.indicatorDot,
-                  isServerReachable ? {backgroundColor: '#10B981'} : {backgroundColor: '#ba1a1a'}
-                ]} />
-              </View>
-              <View style={styles.statusTextContainer}>
-                <Text style={styles.statusLabel}>SERVER</Text>
-                <Text style={styles.statusValue}>{isServerReachable ? "Online" : "Offline"}</Text>
-              </View>
-              <Ionicons name="cloud-done-outline" size={20} color="#475569" />
-            </View>
-          </View>
-          <View style={styles.contentSection}>
-            <Text style={styles.title}>Current Gesture:</Text>
-            <Text style={styles.subtitle}>{currentPrediction}</Text>
-          </View>
+          {renderChart()}
+        </View>
+        {/* Settings Modal */}
+        <Modal
+          visible={isSettingDialogVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setIsSettingDialogVisible(false)}
+        >
+          {/* Dark overlay background */}
+          <View style={styles.modalOverlay}>
+            {/* Dialog Box */}
+            <View style={styles.dialogBox}>
+              
+              <Text style={styles.dialogTitle}>Chart Settings</Text>
 
-          {/* Container for the cards and the overlaying Canvas */}
-          <View style={styles.telemetryContainer}>
-            <View style={styles.cardContainer}>
-              <View style={{display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 20, }}>
-                <TouchableOpacity style={styles.settingsButton} onPress={() => setIsDialogVisible(true)}>
-                  <Ionicons name="settings-outline" size={25} color="black" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.settingsButton}>
-                  <Ionicons name="resize-outline" size={25} color="black" />
-                </TouchableOpacity>
-              </View>
-            </View>
-            
-            {chartType === 'radial' ? (<RadialEMGChart mavValues={mavValues} activeChannels={activeChannels} />) : (
-              chartType === 'raw' ? (<RawEMGChart channels={channels} writeIndices={writeIndices} activeChannels={activeChannels} />) : (
-                <BarEMGChart mavValues={mavValues} activeChannels={activeChannels} />
-              )
-            )}
-          </View>
-          <Modal
-            visible={isDialogVisible}
-            transparent={true}
-            animationType="slide"
-            onRequestClose={() => setIsDialogVisible(false)}
-          >
-            {/* Dark overlay background */}
-            <View style={styles.modalOverlay}>
-              {/* Dialog Box */}
-              <View style={styles.dialogBox}>
-                
-                <Text style={styles.dialogTitle}>Chart Settings</Text>
-
-                {/* --- Chart Type Selection --- */}
-                <Text style={styles.sectionHeader}>Chart Type</Text>
-                <View style={styles.row}>
-                  <TouchableOpacity 
-                    style={[styles.typeButton, chartType === 'radial' && styles.activeType]}
-                    onPress={() => setChartType('radial')}
-                  >
-                    <Text style={chartType === 'radial' ? styles.activeText : styles.inactiveText}>Radial</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={[styles.typeButton, chartType === 'raw' && styles.activeType]}
-                    onPress={() => setChartType('raw')}
-                  >
-                    <Text style={chartType === 'raw' ? styles.activeText : styles.inactiveText}>Raw</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={[styles.typeButton, chartType === 'bars' && styles.activeType]}
-                    onPress={() => setChartType('bars')}
-                  >
-                    <Text style={chartType === 'bars' ? styles.activeText : styles.inactiveText}>Bar</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* --- Channel Selection --- */}
-                <Text style={styles.sectionHeader}>Active Channels</Text>
-                <View style={styles.chipContainer}>
-                  {activeChannels.map((isActive, index) => (
-                    <TouchableOpacity
-                      key={`channel-toggle-${index}`}
-                      style={[styles.chip, isActive ? styles.chipActive : styles.chipInactive]}
-                      onPress={() => toggleChannel(index)}
-                    >
-                      <Text style={isActive ? styles.chipTextActive : styles.chipTextInactive}>
-                        CH {index + 1}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* Close Button */}
+              {/* --- Chart Type Selection --- */}
+              <Text style={styles.sectionHeader}>Chart Type</Text>
+              <View style={styles.row}>
                 <TouchableOpacity 
-                  style={styles.closeButton} 
-                  onPress={() => setIsDialogVisible(false)}
+                  style={[styles.typeButton, chartType === 'radial' && styles.activeType]}
+                  onPress={() => setChartType('radial')}
                 >
-                  <Text style={styles.closeButtonText}>Done</Text>
+                  <Text style={chartType === 'radial' ? styles.activeText : styles.inactiveText}>Radial</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.typeButton, chartType === 'raw' && styles.activeType]}
+                  onPress={() => setChartType('raw')}
+                >
+                  <Text style={chartType === 'raw' ? styles.activeText : styles.inactiveText}>Raw</Text>
                 </TouchableOpacity>
 
+                <TouchableOpacity 
+                  style={[styles.typeButton, chartType === 'bars' && styles.activeType]}
+                  onPress={() => setChartType('bars')}
+                >
+                  <Text style={chartType === 'bars' ? styles.activeText : styles.inactiveText}>Bar</Text>
+                </TouchableOpacity>
               </View>
+
+              {/* --- Channel Selection --- */}
+              <Text style={styles.sectionHeader}>Active Channels</Text>
+              <View style={styles.chipContainer}>
+                {activeChannels.map((isActive, index) => (
+                  <TouchableOpacity
+                    key={`channel-toggle-${index}`}
+                    style={[styles.chip, isActive ? styles.chipActive : styles.chipInactive]}
+                    onPress={() => toggleChannel(index)}
+                  >
+                    <Text style={isActive ? styles.chipTextActive : styles.chipTextInactive}>
+                      CH {index + 1}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Close Button */}
+              <TouchableOpacity 
+                style={styles.closeButton} 
+                onPress={() => setIsSettingDialogVisible(false)}
+              >
+                <Text style={styles.closeButtonText}>Done</Text>
+              </TouchableOpacity>
+
             </View>
-          </Modal>
-        </ScrollView>
-      </SafeAreaView>
-    </SafeAreaProvider>
+          </View>
+        </Modal>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F8FAFC'},
-  container: { 
-    flex: 1, 
-    backgroundColor: '#F8FAFC'
+  safeArea: { 
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  scrollContainer: {
+    flex: 1,
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 60,
+    padding: 10,
+    paddingBottom: 20,
   },
   /* Header Styles */
   headerContainer: {
@@ -441,8 +454,7 @@ const styles = StyleSheet.create({
   
   telemetryContainer: {
     position: 'relative',
-    minHeight: (80 + 12) * 8,
-    paddingBottom: 50
+    height: 550,
   },
   cardContainer: {
     height: 550,
@@ -459,9 +471,12 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
+    height: 26,
+    display: 'flex', 
+    flexDirection: 'row', 
+    justifyContent: 'flex-end', 
+    alignItems: 'center', 
+    gap: 20,
   },
   indicator: {
     width: 8,
@@ -493,10 +508,10 @@ const styles = StyleSheet.create({
   },
   dialogBox: {
     backgroundColor: '#FFFFFF', // Clean white dialog
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
+    borderRadius: 12,
+    padding: 20,
     paddingBottom: 40,
+    margin: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
@@ -537,7 +552,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF', // Primary Blue
     borderColor: '#007AFF',
   },
-  inactiveText: { color: '#64748B' },
+  inactiveText: { color: '#64748B', fontWeight: 'bold' },
   activeText: { color: '#FFFFFF', fontWeight: 'bold' },
 
   // Channel Chips

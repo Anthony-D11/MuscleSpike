@@ -248,17 +248,6 @@ export default function RecordingScreen() {
             
           )}
         </View>
-        <TouchableOpacity 
-                style={[styles.uploadButton, (isUploading || isTraining) && styles.uploadButtonDisabled]} 
-                onPress={handleServerUpload}
-              >
-                {isUploading || isTraining ? <ActivityIndicator color="#FFF" /> : (
-                  <>
-                    <Ionicons name="cloud-upload-outline" size={20} color="#FFF" style={{marginRight: 8}} />
-                    <Text style={styles.uploadButtonText}>Forward Data to Server</Text>
-                  </>
-                )}
-              </TouchableOpacity>
       </SafeAreaView>
     </SafeAreaProvider>
   );

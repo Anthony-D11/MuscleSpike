@@ -3,10 +3,9 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useDerivedValue } from 'react-native-reanimated';
 
-const CENTER = 150;
 const MAX_RADIUS = 120;
-const CHANNELS = 8;
-const MAX_EMG_VALUE = 127;
+const CENTER_X = 160;
+const CENTER_Y = 200;
 
 interface RadarAxisProps {
   cx: number;
@@ -79,20 +78,16 @@ export default function RadialEMGChart({ mavValues, activeChannels }: { mavValue
   const numActiveChannels = activeChannels.filter(Boolean).length;
   const radarPath = useDerivedValue(() => {
     const path = Skia.Path.Make();
-    
-    const centerX = 150; 
-    const centerY = 200;
-    const maxRadius = 200;
 
     for (let i = 0; i < 8; i++) {
       
       if (!activeChannels[i]) continue;
       const angle = (i * (Math.PI * 2)) / numActiveChannels - Math.PI / 2;
       
-      const radius = mavValues.value[i] * maxRadius; 
+      const radius = mavValues.value[i] * MAX_RADIUS; 
       
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
+      const x = CENTER_X + radius * Math.cos(angle);
+      const y = CENTER_Y + radius * Math.sin(angle);
 
       // Draw the lines
       if (i === 0) {
@@ -109,7 +104,7 @@ export default function RadialEMGChart({ mavValues, activeChannels }: { mavValue
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Canvas style={{ flex: 1 }}>
-        <RadarAxis cx={150} cy={200} radius={MAX_RADIUS} numChannels={numActiveChannels} />
+        <RadarAxis cx={CENTER_X} cy={CENTER_Y} radius={MAX_RADIUS} numChannels={numActiveChannels} />
 
         <Path 
           path={radarPath} 
@@ -127,11 +122,3 @@ export default function RadialEMGChart({ mavValues, activeChannels }: { mavValue
     </View>
   );
 }
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#1e1e1e',
-  },
-});
