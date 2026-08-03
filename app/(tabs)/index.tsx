@@ -1,16 +1,18 @@
-//import { EmgPath } from '@/components/emg-path';
+import BarEMGChart from '@/components/BarEMGChart';
+import RadialEMGChart from '@/components/RadialEMGChart';
+import RawEMGChart from '@/components/RawEMGChart';
 import { useBle } from '@/contexts/BleContext';
 import { useModel } from '@/contexts/ServerContext';
 import { ExtractFeatures } from '@/utils/FeatureExtractor';
 import RingBuffer from '@/utils/RingBuffer';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
-import { Canvas, Path, Skia } from '@shopify/react-native-skia';
 import { Buffer } from 'buffer';
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
-import { runOnUI, useDerivedValue, useSharedValue } from 'react-native-reanimated';
+import { Dimensions, Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSharedValue } from 'react-native-reanimated';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { scheduleOnUI } from 'react-native-worklets';
 
 if (typeof global.Buffer === 'undefined') {
   global.Buffer = Buffer;
@@ -23,50 +25,6 @@ const DATA_BUFFER_SIZE = 400;
 const STRIDE = 20;
 const WINDOW_SIZE = 100; 
 const GESTURES = ['No Movement', 'Hand Open', 'Hand Close', 'Supination', 'Pronation'];
-
-const EmgPath = ({ data, writeIndex, xOffset, yOffset }: { data: any, writeIndex: any, xOffset: number, yOffset: number }) => {
-  const path = useDerivedValue(() => {
-    const currentPointer = writeIndex.value; 
-    
-    const skPath = Skia.Path.Make();
-    const currentData = data.value;
-    const length = currentData.length;
-
-    if (length === 0) return skPath;
-
-    const xStep = GRAPH_WIDTH / (length - 1);
-    
-    const getY = (val: number) => {
-      const normalizedY = (GRAPH_HEIGHT / 2) - ((val * GRAPH_HEIGHT) / 2);
-      return normalizedY + yOffset; 
-    };
-
-    for (let i = 0; i < length; i++) {
-      const dataIndex = (currentPointer + i) % length;
-      const x = xOffset + (i * xStep);
-      const y = getY(currentData[dataIndex]);
-
-      if (i === 0) {
-        skPath.moveTo(x, y);
-      } else {
-        skPath.lineTo(x, y);
-      }
-    }
-
-    return skPath;
-  });
-
-  return (
-    <Path 
-      path={path} 
-      color="#0A58CA" 
-      style="stroke" 
-      strokeWidth={1.5} 
-      strokeJoin="round"
-    />
-  );
-};
-
 
 
 export default function DashboardScreen() {
@@ -82,6 +40,11 @@ export default function DashboardScreen() {
   const isFocused = useIsFocused();
   const activeSubscriptions = useRef<any[]>([]);
   const { liveModel, isModelLoaded, isServerReachable, checkServerConnection } = useModel();
+  const mavValues = useSharedValue([0, 0, 0, 0, 0, 0, 0, 0]);
+
+  const [isDialogVisible, setIsDialogVisible] = useState(false);
+  const [chartType, setChartType] = useState<'radial' | 'raw' | 'bars'>('bars');
+  const [activeChannels, setActiveChannels] = useState<boolean[]>(Array(8).fill(true));
 
   useEffect(() => {
     checkServerConnection();
@@ -89,6 +52,7 @@ export default function DashboardScreen() {
 
   const pushBleDataToGraph = (batchedEmgArrays: number[][] ) => {
     'worklet'; 
+    const currentMavs = [...mavValues.value];
     for (let packetIndex = 0; packetIndex < batchedEmgArrays.length; packetIndex++) {
       const emgArray = batchedEmgArrays[packetIndex];
       
@@ -99,10 +63,14 @@ export default function DashboardScreen() {
         
         const normalizedValue = emgArray[i] / 128.0; 
 
+        const absoluteValue = Math.abs(normalizedValue);
+        currentMavs[i] = (0.08 * absoluteValue) + ((1 - 0.08) * currentMavs[i]);
+
         channelData.value[currentIndex] = normalizedValue;
-        writeIndex.value = (currentIndex + 1) % DATA_BUFFER_SIZE; 
+        writeIndex.value = (currentIndex + 1) % DATA_BUFFER_SIZE;
       }
     }
+    mavValues.value = currentMavs;
   };
   
   
@@ -149,7 +117,7 @@ export default function DashboardScreen() {
                   rawBytes.readInt8(12), rawBytes.readInt8(13), rawBytes.readInt8(14), rawBytes.readInt8(15)
                 ]);
                 if (packetBatch.length >= 4) {
-                  runOnUI(pushBleDataToGraph)([...packetBatch]);
+                  scheduleOnUI(pushBleDataToGraph, [...packetBatch]);
                   packetBatch = [];
                 }
                 samplesSinceLastPredict.current += 2;
@@ -195,6 +163,13 @@ export default function DashboardScreen() {
     } catch (e) {
       console.error("Math execution crashed:", e);
     }
+  };
+  const toggleChannel = (index: number) => {
+    setActiveChannels(prev => {
+      const newChannels = [...prev];
+      newChannels[index] = !newChannels[index];
+      return newChannels;
+    });
   };
 
   return (
@@ -247,41 +222,88 @@ export default function DashboardScreen() {
 
           {/* Container for the cards and the overlaying Canvas */}
           <View style={styles.telemetryContainer}>
-            
-            {/* 1. Standard Native Views for the UI Chrome (Text, Backgrounds) */}
-            {channels.map((_, index) => (
-              <View key={`card-${index}`} style={styles.cardContainer}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.indicator} />
-                  <Text style={styles.channelText}>CH {index + 1}</Text>
-                </View>
-                {/* Empty space where the graph will be drawn by the overlay */}
-                <View style={{ height: GRAPH_HEIGHT }} />
+            <View style={styles.cardContainer}>
+              <View style={{display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 20, }}>
+                <TouchableOpacity style={styles.settingsButton} onPress={() => setIsDialogVisible(true)}>
+                  <Ionicons name="settings-outline" size={25} color="black" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.settingsButton}>
+                  <Ionicons name="resize-outline" size={25} color="black" />
+                </TouchableOpacity>
               </View>
-            ))}
-
-            {/* 2. THE SINGLE CANVAS OVERLAY */}
-            <View style={StyleSheet.absoluteFill} pointerEvents="none">
-              <Canvas style={{ flex: 1 }}>
-                {channels.map((channelData, index) => {
-                  // Calculate exactly where on the Y-axis this line should be drawn
-                  // Margin top + (Index * (Card Height + Margin Bottom)) + Header Offset
-                  const yOffset = 9 + (index * (CARD_HEIGHT + 12)) + 30; 
-                  
-                  return (
-                    <EmgPath 
-                      key={`path-${index}`} 
-                      data={channelData} 
-                      writeIndex={writeIndices[index]}
-                      xOffset={12}
-                      yOffset={yOffset} 
-                    />
-                  );
-                })}
-              </Canvas>
             </View>
-
+            
+            {chartType === 'radial' ? (<RadialEMGChart mavValues={mavValues} activeChannels={activeChannels} />) : (
+              chartType === 'raw' ? (<RawEMGChart channels={channels} writeIndices={writeIndices} activeChannels={activeChannels} />) : (
+                <BarEMGChart mavValues={mavValues} activeChannels={activeChannels} />
+              )
+            )}
           </View>
+          <Modal
+            visible={isDialogVisible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setIsDialogVisible(false)}
+          >
+            {/* Dark overlay background */}
+            <View style={styles.modalOverlay}>
+              {/* Dialog Box */}
+              <View style={styles.dialogBox}>
+                
+                <Text style={styles.dialogTitle}>Chart Settings</Text>
+
+                {/* --- Chart Type Selection --- */}
+                <Text style={styles.sectionHeader}>Chart Type</Text>
+                <View style={styles.row}>
+                  <TouchableOpacity 
+                    style={[styles.typeButton, chartType === 'radial' && styles.activeType]}
+                    onPress={() => setChartType('radial')}
+                  >
+                    <Text style={chartType === 'radial' ? styles.activeText : styles.inactiveText}>Radial</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.typeButton, chartType === 'raw' && styles.activeType]}
+                    onPress={() => setChartType('raw')}
+                  >
+                    <Text style={chartType === 'raw' ? styles.activeText : styles.inactiveText}>Raw</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.typeButton, chartType === 'bars' && styles.activeType]}
+                    onPress={() => setChartType('bars')}
+                  >
+                    <Text style={chartType === 'bars' ? styles.activeText : styles.inactiveText}>Bar</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* --- Channel Selection --- */}
+                <Text style={styles.sectionHeader}>Active Channels</Text>
+                <View style={styles.chipContainer}>
+                  {activeChannels.map((isActive, index) => (
+                    <TouchableOpacity
+                      key={`channel-toggle-${index}`}
+                      style={[styles.chip, isActive ? styles.chipActive : styles.chipInactive]}
+                      onPress={() => toggleChannel(index)}
+                    >
+                      <Text style={isActive ? styles.chipTextActive : styles.chipTextInactive}>
+                        CH {index + 1}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Close Button */}
+                <TouchableOpacity 
+                  style={styles.closeButton} 
+                  onPress={() => setIsDialogVisible(false)}
+                >
+                  <Text style={styles.closeButtonText}>Done</Text>
+                </TouchableOpacity>
+
+              </View>
+            </View>
+          </Modal>
         </ScrollView>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -423,7 +445,7 @@ const styles = StyleSheet.create({
     paddingBottom: 50
   },
   cardContainer: {
-    height: 80,
+    height: 550,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
@@ -453,5 +475,106 @@ const styles = StyleSheet.create({
     fontSize: 14, 
     fontWeight: 'bold',
     letterSpacing: 0.5,
+  },
+  settingsButton: {
+    
+  },
+  buttonText: {
+    color: '#007AFF', // Primary Blue
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Lighter dimming for light mode
+    justifyContent: 'center',
+  },
+  dialogBox: {
+    backgroundColor: '#FFFFFF', // Clean white dialog
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    paddingBottom: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  dialogTitle: {
+    color: '#1E293B', // Dark slate for high contrast
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  sectionHeader: {
+    color: '#64748B', // Slate grey
+    fontSize: 14,
+    textTransform: 'uppercase',
+    fontWeight: '600',
+    marginBottom: 10,
+    marginTop: 10,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  
+  // Type Buttons
+  typeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+  },
+  activeType: {
+    backgroundColor: '#007AFF', // Primary Blue
+    borderColor: '#007AFF',
+  },
+  inactiveText: { color: '#64748B' },
+  activeText: { color: '#FFFFFF', fontWeight: 'bold' },
+
+  // Channel Chips
+  chipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 30,
+  },
+  chip: {
+    width: '22%', 
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  chipActive: {
+    backgroundColor: 'rgba(0, 122, 255, 0.1)', // Tinted blue background
+    borderColor: '#007AFF',
+  },
+  chipInactive: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
+  chipTextActive: { color: '#007AFF', fontWeight: 'bold' },
+  chipTextInactive: { color: '#64748B' },
+
+  // Close Button
+  closeButton: {
+    backgroundColor: '#007AFF', // Primary Blue
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
