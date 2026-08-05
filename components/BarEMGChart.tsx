@@ -14,8 +14,9 @@ import { useDerivedValue } from 'react-native-reanimated';
 const AnimatedBar = ({ index, xPos, barWidth, chartHeight, padTop, maxMav, mavValues, activeChannels }: { index: number, xPos: number, barWidth: number, chartHeight: number, padTop: number, maxMav: number, mavValues: any, activeChannels: boolean[] }) => {
   const animatedHeight = useDerivedValue(() => {
     if (!activeChannels[index]) return 0;
+    const UI_MAX = 0.5; // Maximum value for the UI representation
     const value = mavValues.value[index] || 0;
-    return value * chartHeight;
+    return Math.min(value / UI_MAX, 1) * chartHeight;
   });
 
   const animatedY = useDerivedValue(() => {

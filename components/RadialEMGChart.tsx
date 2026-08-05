@@ -84,7 +84,8 @@ export default function RadialEMGChart({ mavValues, activeChannels }: { mavValue
       if (!activeChannels[i]) continue;
       const angle = (i * (Math.PI * 2)) / numActiveChannels - Math.PI / 2;
       
-      const radius = mavValues.value[i] * MAX_RADIUS; 
+      const UI_MAX = 0.5; // Maximum value for the UI representation
+      const radius = Math.min(mavValues.value[i] / UI_MAX, 1) * MAX_RADIUS;
       
       const x = CENTER_X + radius * Math.cos(angle);
       const y = CENTER_Y + radius * Math.sin(angle);

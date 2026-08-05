@@ -59,9 +59,7 @@ export default function DashboardScreen() {
         const currentIndex = writeIndex.value;
         
         const normalizedValue = emgArray[i] / 128.0; 
-        if (emgArray[i] > 100) {
-          console.log(emgArray[i], normalizedValue);
-        }
+        
         const absoluteValue = Math.abs(normalizedValue);
         currentMavs[i] = (0.08 * absoluteValue) + ((1 - 0.08) * currentMavs[i]);
 
