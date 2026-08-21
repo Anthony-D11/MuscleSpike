@@ -19,9 +19,10 @@ export const ServerProvider = ({ children }: { children: React.ReactNode }) => {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [isServerReachable, setIsServerReachable] = useState(false);
 
-  const baseServerUrl = "https://musclespikeserver.onrender.com";
-  // const baseServerUrl = "http://10.0.0.233:5000";
-
+  let baseServerUrl = process.env.EXPO_PUBLIC_SERVER_URL;
+  if (__DEV__) {
+    baseServerUrl = baseServerUrl + ":5000";
+  }
   useEffect(() => {
     loadModelFromDisk();
   }, []);

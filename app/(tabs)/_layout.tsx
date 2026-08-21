@@ -12,36 +12,29 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
         headerShown: false,
         tabBarButton: HapticTab,
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: "Home",
           tabBarIcon: ({ color }) => <MaterialCommunityIcons name="home" size={28} color={color} />,
         }}
       />
       <Tabs.Screen
         name="connection"
         options={{
-          title: 'Connection',
+          title: "Connection",
           tabBarIcon: ({ color }) => <MaterialCommunityIcons name="wifi-settings" size={28} color={color} />,
         }}
       />
       <Tabs.Screen
         name="training"
         options={{
-          title: 'Training',
+          title: "Training",
           tabBarIcon: ({ color }) => <MaterialCommunityIcons name="dumbbell" size={28} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="monitor"
-        options={{
-          title: 'Monitor',
-          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="chart-box-outline" size={28} color={color} />,
         }}
       />
     </Tabs>
