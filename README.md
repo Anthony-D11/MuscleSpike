@@ -1,53 +1,65 @@
-# Welcome to your Expo app 👋
+# MuscleSpike Mobile Application
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+👉 [**MuscleSpike Backend Server**](https://github.com/Anthony-D11/MuscleSpikeServer)
 
-## Lesson learned
-- Error Canvas crashes with "Expected arraybuffer as first parameter" error: Caused by dependency conflict - fix by running npx expo install @shopify/react-native-skia 
+A high-performance React Native mobile application designed to interface with the Myo armband. It streams, processes, and visualizes 8-channel electromyography (EMG) data in real-time with zero UI thread blocking.
 
-## Get started
+## Features
 
-1. Install dependencies
+- **Native Bluetooth Low Energy (BLE):** Scans for, connects to, and handles 200Hz data streams from the Myo armband.
+- **Real-Time Signal Processing:** Applies full-wave rectification and Exponential Moving Average (EMA) filters to approximate Mean Absolute Value (MAV) on the fly.
+- **High-Fidelity Visualizations:** Utilizes React Native Skia and Reanimated worklets to render dynamic charts at 60 FPS without touching the React render cycle.
+  - _Radial Chart:_ Spatial mapping of muscle activation.
+  - _Amplitude Bars:_ Equalizer-style UI for individual channel intensity.
+  - _Raw Signal:_ Real-time oscilloscope view.
+- **Dynamic Controls:** Granular channel selection and dynamic chart scaling.
+- **Guided Training Flow:** A state-driven wizard that directs users through a fixed calibration and muscle training process.
+- **Server Synchronization:** Maintains an active connection to the backend for session data offloading.
 
+## Tech Stack
+
+- **Framework:** React Native / Expo (Custom Development Build)
+- **Graphics:** React Native Skia
+- **Animation & Worklets:** React Native Reanimated
+- **Hardware Integration:** `react-native-ble-plx` (or equivalent BLE library)
+
+## Installation & Setup
+
+Because this app utilizes native Bluetooth modules, it cannot be run inside the standard Expo Go app. You must compile a custom development client.
+
+1. **Clone the repository and install dependencies:**
    ```bash
+   git clone https://github.com/Anthony-D11/MuscleSpike.git
+   cd MuscleSpike
    npm install
    ```
-
-2. Start the app
+2. **Configure the local backend:**
+   ```bash
+   cp .env.example .env
+   ```
+   Set the value of EXPO_PUBLIC_SERVER_URL to the correct server url. In case the server is on the local machine, find the IPv4 address by using this command in any terminals:
+   ```bash
+   ipconfig
+   ```
+3. **Compile and run the development build:**
 
    ```bash
-   npx expo start
+   # For Android
+   npx expo run:android
+
+   # For iOS
+   npx expo run:ios
    ```
 
-In the output, you'll find options to open the app in a
+4. **Demo:**
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   Dashboard screen:
+   ![Dashboard screen](demo/dashboard_08212026.jpg)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+   Connection screen:
+   ![Connection screen](demo/connection_08212026.jpg)
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+   Training screen:
+   ![Training process in progress](demo/training_in_progress_08212026.jpg)
+   ![Training process completed](demo/training_completed_08212026.jpg)
+   ![File upload to server successfully](demo/file_upload_successful_08212026.jpg)
