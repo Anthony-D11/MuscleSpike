@@ -74,8 +74,12 @@ export const RadarAxis = ({ cx, cy, radius, numChannels = 8 }: RadarAxisProps) =
 };
 
 
-export default function RadialEMGChart({ mavValues, activeChannels }: { mavValues: any, activeChannels: boolean[] }) {
+export default function RadialEMGChart({ mavValues, activeChannels, width, height }: { mavValues: any, activeChannels: boolean[], width?: number, height?: number }) {
   const numActiveChannels = activeChannels.filter(Boolean).length;
+  const centerX = width && height ? width / 2 : CENTER_X;
+  const centerY = width && height ? height / 2 : CENTER_Y;
+  const maxRadius = width && height ? Math.max(50, Math.min(width, height) / 2 - 45) : MAX_RADIUS;
+
   const radarPath = useDerivedValue(() => {
     const path = Skia.Path.Make();
 
@@ -85,10 +89,10 @@ export default function RadialEMGChart({ mavValues, activeChannels }: { mavValue
       const angle = (i * (Math.PI * 2)) / numActiveChannels - Math.PI / 2;
       
       const UI_MAX = 0.5; // Maximum value for the UI representation
-      const radius = Math.min(mavValues.value[i] / UI_MAX, 1) * MAX_RADIUS;
+      const radius = Math.min(mavValues.value[i] / UI_MAX, 1) * maxRadius;
       
-      const x = CENTER_X + radius * Math.cos(angle);
-      const y = CENTER_Y + radius * Math.sin(angle);
+      const x = centerX + radius * Math.cos(angle);
+      const y = centerY + radius * Math.sin(angle);
 
       // Draw the lines
       if (i === 0) {
@@ -105,7 +109,7 @@ export default function RadialEMGChart({ mavValues, activeChannels }: { mavValue
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Canvas style={{ flex: 1 }}>
-        <RadarAxis cx={CENTER_X} cy={CENTER_Y} radius={MAX_RADIUS} numChannels={numActiveChannels} />
+        <RadarAxis cx={centerX} cy={centerY} radius={maxRadius} numChannels={numActiveChannels} />
 
         <Path 
           path={radarPath} 

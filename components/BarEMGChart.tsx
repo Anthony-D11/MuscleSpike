@@ -8,7 +8,7 @@ import {
   vec
 } from '@shopify/react-native-skia';
 import React from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { useWindowDimensions, StyleSheet, View } from 'react-native';
 import { useDerivedValue } from 'react-native-reanimated';
 
 const AnimatedBar = ({ index, xPos, barWidth, chartHeight, padTop, maxMav, mavValues, activeChannels }: { index: number, xPos: number, barWidth: number, chartHeight: number, padTop: number, maxMav: number, mavValues: any, activeChannels: boolean[] }) => {
@@ -35,16 +35,16 @@ const AnimatedBar = ({ index, xPos, barWidth, chartHeight, padTop, maxMav, mavVa
 };
 
 // 2. MAIN COMPONENT
-export default function BarEMGChart ({ mavValues, activeChannels }: { mavValues: any, activeChannels: boolean[] }) {
+export default function BarEMGChart ({ mavValues, activeChannels, width, height }: { mavValues: any, activeChannels: boolean[], width?: number, height?: number }) {
   
   const PAD_LEFT = 30;
   const PAD_BOTTOM = 25;
-  const PAD_TOP = 60;
+  const PAD_TOP = height == null ? 60 : 20;
   const PAD_RIGHT = 15;
 
-  const { width } = Dimensions.get('window');
-  const GRAPH_WIDTH = width - 60;
-  const GRAPH_HEIGHT = 250;
+  const { width: windowWidth } = useWindowDimensions();
+  const GRAPH_WIDTH = (width ?? windowWidth) - 60;
+  const GRAPH_HEIGHT = Math.max(100, (height ?? PAD_TOP + 250 + PAD_BOTTOM) - PAD_TOP - PAD_BOTTOM);
   
   const tempArray = Array.from({ length: 8 }, (_, i) => 0);
 

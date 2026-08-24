@@ -8,8 +8,10 @@ import RingBuffer from '@/utils/RingBuffer';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { Buffer } from 'buffer';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import type { LayoutChangeEvent } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnUI } from 'react-native-worklets';
@@ -42,10 +44,26 @@ export default function DashboardScreen() {
   const [isSettingDialogVisible, setIsSettingDialogVisible] = useState(false);
   const [chartType, setChartType] = useState<'radial' | 'raw' | 'bars'>('bars');
   const [activeChannels, setActiveChannels] = useState<boolean[]>(Array(8).fill(true));
+  const [isFullscreenChartVisible, setIsFullscreenChartVisible] = useState(false);
+  const [isFullscreenSettingsVisible, setIsFullscreenSettingsVisible] = useState(false);
+  const [chartCardSize, setChartCardSize] = useState({ width: 0, height: 0 });
+
+  const handleFullscreenCardLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setChartCardSize(prev => (prev.width !== width || prev.height !== height ? { width, height } : prev));
+  };
 
   useEffect(() => {
     checkServerConnection();
   }, [isFocused]);
+
+  useEffect(() => {
+    return () => {
+      ScreenOrientation
+        .lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
+        .catch(() => {});
+    };
+  }, []);
 
   const pushBleDataToGraph = (batchedEmgArrays: number[][] ) => {
     'worklet'; 
@@ -170,14 +188,93 @@ export default function DashboardScreen() {
     });
   };
 
-  const renderChart = () => {
+  const openFullscreenChart = async () => {
+    try {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+    } catch (e) {
+      console.error('Failed to lock landscape orientation:', e);
+    }
+    setIsFullscreenChartVisible(true);
+  };
+
+  const closeFullscreenChart = async () => {
+    setIsFullscreenSettingsVisible(false);
+    setIsFullscreenChartVisible(false);
+    try {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    } catch (e) {
+      console.error('Failed to restore portrait orientation:', e);
+    }
+  };
+
+  const renderChartSettingsBody = (onDone: () => void) => (
+    <ScrollView
+      style={styles.dialogScroll}
+      contentContainerStyle={styles.dialogScrollContent}
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+    >
+      <Text style={styles.dialogTitle}>Chart Settings</Text>
+
+      {/* --- Chart Type Selection --- */}
+      <Text style={styles.sectionHeader}>Chart Type</Text>
+      <View style={styles.row}>
+        <TouchableOpacity
+          style={[styles.typeButton, chartType === 'radial' && styles.activeType]}
+          onPress={() => setChartType('radial')}
+        >
+          <Text style={chartType === 'radial' ? styles.activeText : styles.inactiveText}>Radial</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.typeButton, chartType === 'raw' && styles.activeType]}
+          onPress={() => setChartType('raw')}
+        >
+          <Text style={chartType === 'raw' ? styles.activeText : styles.inactiveText}>Raw</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.typeButton, chartType === 'bars' && styles.activeType]}
+          onPress={() => setChartType('bars')}
+        >
+          <Text style={chartType === 'bars' ? styles.activeText : styles.inactiveText}>Bar</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* --- Channel Selection --- */}
+      <Text style={styles.sectionHeader}>Active Channels</Text>
+      <View style={styles.chipContainer}>
+        {activeChannels.map((isActive, index) => (
+          <TouchableOpacity
+            key={`channel-toggle-${index}`}
+            style={[styles.chip, isActive ? styles.chipActive : styles.chipInactive]}
+            onPress={() => toggleChannel(index)}
+          >
+            <Text style={isActive ? styles.chipTextActive : styles.chipTextInactive}>
+              CH {index + 1}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Close Button */}
+      <TouchableOpacity
+        style={styles.closeButton}
+        onPress={onDone}
+      >
+        <Text style={styles.closeButtonText}>Done</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+
+  const renderChart = (size?: { width: number; height: number }) => {
     switch (chartType) {
       case 'radial':
-        return <RadialEMGChart mavValues={mavValues} activeChannels={activeChannels} />;
+        return <RadialEMGChart mavValues={mavValues} activeChannels={activeChannels} width={size?.width} height={size?.height} />;
       case 'raw':
-        return <RawEMGChart channels={channels} writeIndices={writeIndices} activeChannels={activeChannels} />;
+        return <RawEMGChart channels={channels} writeIndices={writeIndices} activeChannels={activeChannels} width={size?.width} height={size?.height} />;
       case 'bars':
-        return <BarEMGChart mavValues={mavValues} activeChannels={activeChannels} />;
+        return <BarEMGChart mavValues={mavValues} activeChannels={activeChannels} width={size?.width} height={size?.height} />;
       default:
         return null;
     }
@@ -241,9 +338,9 @@ export default function DashboardScreen() {
               <TouchableOpacity style={styles.settingsButton} onPress={() => setIsSettingDialogVisible(true)}>
                 <Ionicons name="settings-outline" size={25} color="black" />
               </TouchableOpacity>
-              {/* <TouchableOpacity style={styles.settingsButton}>
+              <TouchableOpacity style={styles.settingsButton} onPress={openFullscreenChart}>
                 <Ionicons name="resize-outline" size={25} color="black" />
-              </TouchableOpacity> */}
+              </TouchableOpacity>
             </View>
           </View>
           {renderChart()}
@@ -259,58 +356,49 @@ export default function DashboardScreen() {
           <View style={styles.modalOverlay}>
             {/* Dialog Box */}
             <View style={styles.dialogBox}>
-              
-              <Text style={styles.dialogTitle}>Chart Settings</Text>
-
-              {/* --- Chart Type Selection --- */}
-              <Text style={styles.sectionHeader}>Chart Type</Text>
-              <View style={styles.row}>
-                <TouchableOpacity 
-                  style={[styles.typeButton, chartType === 'radial' && styles.activeType]}
-                  onPress={() => setChartType('radial')}
+              {renderChartSettingsBody(() => setIsSettingDialogVisible(false))}
+            </View>
+          </View>
+        </Modal>
+        {/* Fullscreen Landscape Chart Dialog */}
+        <Modal
+          visible={isFullscreenChartVisible}
+          animationType="fade"
+          onRequestClose={closeFullscreenChart}
+        >
+          <SafeAreaView style={styles.fullscreenContainer} edges={['top', 'bottom', 'left', 'right']}>
+            <View style={styles.fullscreenChartCard}>
+              {/* Controls row (above the chart) */}
+              <View style={styles.fullscreenControls}>
+                <TouchableOpacity
+                  style={styles.settingsButton}
+                  onPress={() => setIsFullscreenSettingsVisible(true)}
                 >
-                  <Text style={chartType === 'radial' ? styles.activeText : styles.inactiveText}>Radial</Text>
+                  <Ionicons name="settings-outline" size={25} color="black" />
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.typeButton, chartType === 'raw' && styles.activeType]}
-                  onPress={() => setChartType('raw')}
+                <TouchableOpacity
+                  style={styles.settingsButton}
+                  onPress={closeFullscreenChart}
                 >
-                  <Text style={chartType === 'raw' ? styles.activeText : styles.inactiveText}>Raw</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={[styles.typeButton, chartType === 'bars' && styles.activeType]}
-                  onPress={() => setChartType('bars')}
-                >
-                  <Text style={chartType === 'bars' ? styles.activeText : styles.inactiveText}>Bar</Text>
+                  <Ionicons name="contract-outline" size={25} color="black" />
                 </TouchableOpacity>
               </View>
-
-              {/* --- Channel Selection --- */}
-              <Text style={styles.sectionHeader}>Active Channels</Text>
-              <View style={styles.chipContainer}>
-                {activeChannels.map((isActive, index) => (
-                  <TouchableOpacity
-                    key={`channel-toggle-${index}`}
-                    style={[styles.chip, isActive ? styles.chipActive : styles.chipInactive]}
-                    onPress={() => toggleChannel(index)}
-                  >
-                    <Text style={isActive ? styles.chipTextActive : styles.chipTextInactive}>
-                      CH {index + 1}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              <View style={styles.fullscreenChartArea} onLayout={handleFullscreenCardLayout}>
+                {chartCardSize.width > 0 && chartCardSize.height > 0 && renderChart(chartCardSize)}
               </View>
-
-              {/* Close Button */}
-              <TouchableOpacity 
-                style={styles.closeButton} 
-                onPress={() => setIsSettingDialogVisible(false)}
-              >
-                <Text style={styles.closeButtonText}>Done</Text>
-              </TouchableOpacity>
-
+            </View>
+          </SafeAreaView>
+        </Modal>
+        {/* Fullscreen Chart Settings Popup */}
+        <Modal
+          visible={isFullscreenSettingsVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setIsFullscreenSettingsVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.dialogBox, styles.fullscreenDialogBox]}>
+              {renderChartSettingsBody(() => setIsFullscreenSettingsVisible(false))}
             </View>
           </View>
         </Modal>
@@ -508,13 +596,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF', // Clean white dialog
     borderRadius: 12,
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 24,
     margin: 10,
+    maxHeight: '85%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 10,
+  },
+  dialogScroll: {
+    flexGrow: 0,
+  },
+  dialogScrollContent: {
+    paddingBottom: 4,
   },
   dialogTitle: {
     color: '#1E293B', // Dark slate for high contrast
@@ -589,5 +684,40 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+
+  /* Fullscreen Chart Dialog Styles */
+  fullscreenContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  fullscreenChartCard: {
+    flex: 1,
+    margin: 6,
+    paddingTop: 6,
+    paddingBottom: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  fullscreenControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+  },
+  fullscreenDialogBox: {
+    alignSelf: 'center',
+    width: '85%',
+    maxWidth: 560,
+    maxHeight: '90%',
+    paddingBottom: 12,
+  },
+  fullscreenChartArea: {
+    flex: 1,
   },
 });

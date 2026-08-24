@@ -1,13 +1,13 @@
 import { Canvas, Group, Path, Skia, Text, useFont } from "@shopify/react-native-skia";
-import { Dimensions, StyleSheet, View } from "react-native";
+import { useWindowDimensions, StyleSheet, View } from "react-native";
 import { useDerivedValue } from "react-native-reanimated";
 
 
-const { width } = Dimensions.get('window');
-const GRAPH_WIDTH = width - 70;
-const CHANNEL_HEIGHT = 50;
+const HEADER_OFFSET = 45;
+const DEFAULT_CHART_HEIGHT = 541;
+const MIN_CHANNEL_HEIGHT = 18;
 
-const EmgPath = ({ data, writeIndex, xOffset, yOffset }: { data: any, writeIndex: any, xOffset: number, yOffset: number }) => {
+const EmgPath = ({ data, writeIndex, xOffset, yOffset, graphWidth, channelHeight }: { data: any, writeIndex: any, xOffset: number, yOffset: number, graphWidth: number, channelHeight: number }) => {
   const path = useDerivedValue(() => {
     const currentPointer = writeIndex.value; 
     
@@ -17,10 +17,10 @@ const EmgPath = ({ data, writeIndex, xOffset, yOffset }: { data: any, writeIndex
 
     if (length === 0) return skPath;
 
-    const xStep = GRAPH_WIDTH / (length - 1);
+    const xStep = graphWidth / (length - 1);
     
     const getY = (val: number) => {
-      const normalizedY = (CHANNEL_HEIGHT / 2) - ((val * CHANNEL_HEIGHT) / 2);
+      const normalizedY = (channelHeight / 2) - ((val * channelHeight) / 2);
       return normalizedY + yOffset; 
     };
 
@@ -50,8 +50,17 @@ const EmgPath = ({ data, writeIndex, xOffset, yOffset }: { data: any, writeIndex
   );
 };
 
-export default function RawEMGChart({ channels, writeIndices, activeChannels }: { channels: any[], writeIndices: any[], activeChannels: boolean[] }) {
+export default function RawEMGChart({ channels, writeIndices, activeChannels, width: fixedWidth, height: fixedHeight }: { channels: any[], writeIndices: any[], activeChannels: boolean[], width?: number, height?: number }) {
   const tempArray = Array.from({ length: 8 }, (_, i) => 0);
+
+  const { width } = useWindowDimensions();
+  const GRAPH_WIDTH = (fixedWidth ?? width) - 70;
+
+  const numActiveChannels = activeChannels.filter(Boolean).length || 1;
+  const headerOffset = fixedHeight == null ? HEADER_OFFSET : 14;
+  const availableHeight = (fixedHeight ?? DEFAULT_CHART_HEIGHT) - headerOffset;
+  const slotHeight = availableHeight / numActiveChannels;
+  const CHANNEL_HEIGHT = Math.min(50, Math.max(MIN_CHANNEL_HEIGHT, slotHeight * 0.8));
 
   const font = useFont(require('../assets/fonts/Roboto-Regular.ttf'), 10);
   if (!font) {
@@ -68,8 +77,8 @@ export default function RawEMGChart({ channels, writeIndices, activeChannels }: 
           }
           tempArray[index] = (index === 0 ? 0 : tempArray[index - 1]) + 1;
           // Calculate exactly where on the Y-axis this line should be drawn
-          // Margin top + (Index * (Card Height + Margin Bottom)) + Header Offset
-          const yOffset = 45 + (tempArray[index] - 1) * (CHANNEL_HEIGHT + 12); 
+          // Margin top + (Index * Slot Height)
+          const yOffset = headerOffset + (tempArray[index] - 1) * slotHeight; 
           
           return (
             <Group key={`group-${index}`} >
@@ -86,6 +95,8 @@ export default function RawEMGChart({ channels, writeIndices, activeChannels }: 
                 writeIndex={writeIndices[index]}
                 xOffset={30}
                 yOffset={yOffset} 
+                graphWidth={GRAPH_WIDTH}
+                channelHeight={CHANNEL_HEIGHT}
               />
             </Group>
           );
