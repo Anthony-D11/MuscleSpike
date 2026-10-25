@@ -1,9 +1,11 @@
-export const GESTURE_MOTIONS = [
-  "No Movement",
-  "Hand Open",
-  "Hand Close",
-  "Wrist Extension",
-  "Wrist Flexion",
+import type { ImageSourcePropType } from "react-native";
+
+export const GESTURE_MOTIONS: {label: string, image: ImageSourcePropType}[] = [
+  {label: "No Movement", image: require("../assets/images/no_movement.png")},
+  {label: "Hand Open", image: require("../assets/images/hand_open.png")},
+  {label: "Hand Close", image: require("../assets/images/hand_close.png")},
+  {label: "Wrist Extension", image: require("../assets/images/wrist_extension.png")},
+  {label: "Wrist Flexion", image: require("../assets/images/wrist_flexion.png")},
 ];
 
 export const ALGORITHM_OPTIONS = [

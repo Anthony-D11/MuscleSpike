@@ -1,3 +1,4 @@
+import { GESTURE_MOTIONS } from '@/constants/app-config';
 import { CommonStyles } from '@/constants/shared-styles';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { useBle } from '@/contexts/BleContext';
@@ -10,6 +11,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -24,8 +26,9 @@ export default function RecordingScreen() {
   
   const [trialId, setTrialId] = useState(1);
   const [gestureId, setGestureId] = useState(0);
-  const [status, setStatus] = useState<'IDLE' | 'RECORDING' | 'DONE'>('IDLE');
-  const [timeLeft, setTimeLeft] = useState(repDuration);
+  const [status, setStatus] = useState<'IDLE' | 'STARTING' | 'RECORDING' | 'DONE'>('IDLE');
+  const [repTimer, setRepTimer] = useState(repDuration);
+  const [startTimer, setStartTimer] = useState(3);
   const [isUploading, setIsUploading] = useState(false);
   const [isTraining, setIsTraining] = useState(false);
 
@@ -34,7 +37,9 @@ export default function RecordingScreen() {
   const activeSubscriptions = useRef<any[]>([]);
   const { uploadEMGData, trainAndInstallModel } = useModel();
   
-  useEffect(() => setTimeLeft(repDuration), [repDuration]);
+  const motion = GESTURE_MOTIONS.find(m => m.label === trainingMotions[gestureId]);
+  
+  useEffect(() => setRepTimer(repDuration), [repDuration]);
   useEffect(() => {
     if (!connectedDevice || !isFocused) return;
 
@@ -96,9 +101,8 @@ export default function RecordingScreen() {
     if (status === 'RECORDING') {
       isRecordingRef.current = true;
       dataBuffer.current = [];
-      
       timer = setInterval(() => {
-        setTimeLeft((prev) => {
+        setRepTimer((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
             completeCaptureStep();
@@ -108,7 +112,18 @@ export default function RecordingScreen() {
         });
       }, 1000);
     }
-
+    else if (status === 'STARTING') {
+      timer = setInterval(() => {
+        setStartTimer((prev) => {
+          if (prev <= 1) {
+            setStatus('RECORDING');
+            clearInterval(timer);
+            return 3;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
     return () => clearInterval(timer);
   }, [status]);
 
@@ -126,7 +141,7 @@ export default function RecordingScreen() {
       setStatus('DONE');
     }
     
-    setTimeLeft(repDuration);
+    setRepTimer(repDuration);
   };
 
   const saveBufferToCSV = () => {
@@ -168,7 +183,7 @@ export default function RecordingScreen() {
   const handleResetProtocol = () => {
     setTrialId(1);
     setGestureId(0);
-    setTimeLeft(repDuration);
+    setRepTimer(repDuration);
     setStatus('IDLE');
   };
 
@@ -220,27 +235,33 @@ export default function RecordingScreen() {
               <Text style={styles.targetLabel}>TARGET MOTION</Text>
               <Text style={styles.gestureName}>{trainingMotions[gestureId]}</Text>
 
-              <View style={styles.timerCircle}>
-                <Text style={[styles.timerText, status === 'RECORDING' && styles.timerTextActive]}>
-                  {timeLeft}s
-                </Text>
-              </View>
+              {motion && (
+                <Image
+                  source={motion.image}
+                  style={styles.motionImage}
+                  resizeMode="contain"
+                />
+              )}
 
               {status === 'IDLE' ? (
                 <TouchableOpacity 
                   style={[CommonStyles.primaryButton, styles.actionButton]} 
-                  onPress={() => setStatus('RECORDING')}
+                  onPress={() => setStatus('STARTING')}
                   disabled={!connectedDevice}
                 >
                   <Text style={styles.actionButtonText}>
                     {connectedDevice ? `Begin ${repDuration}s Capture` : "Device Disconnected"}
                   </Text>
                 </TouchableOpacity>
-              ) : (
+              ) : ( status === 'RECORDING' ? 
                 <View style={[CommonStyles.primaryButton, styles.actionButton, styles.actionButtonActive]}>
                   <ActivityIndicator color="#FFF" />
                   <Text style={[styles.actionButtonText, {marginLeft: 10}]}>Recording...</Text>
-                </View>
+                </View> 
+                :
+                <View style={[CommonStyles.primaryButton, styles.actionButton, styles.actionButtonActive]}>
+                  <Text style={[styles.actionButtonText, {marginLeft: 10}]}>Starting Recording in {startTimer}</Text>
+                </View> 
               )}
               
             </View>
@@ -263,9 +284,7 @@ const styles = StyleSheet.create({
   targetLabel: { fontSize: 12, fontWeight: 'bold', color: '#94A3B8', marginBottom: 4 },
   gestureName: { fontSize: 32, fontWeight: '800', color: '#1E293B', textAlign: 'center', marginBottom: 32 },
   
-  timerCircle: { width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center', marginBottom: 32 },
-  timerText: { fontSize: 36, fontWeight: 'bold', color: '#94A3B8' },
-  timerTextActive: { color: '#EF4444' },
+  motionImage: { width: 220, height: 220, borderRadius: 16, marginBottom: 32 },
 
   actionButton: { width: '100%', padding: 18 },
   actionButtonActive: { backgroundColor: '#EF4444' },

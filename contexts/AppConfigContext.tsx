@@ -22,7 +22,7 @@ export const AppConfigProvider = ({ children }: { children: React.ReactNode }) =
   const [trainingAlgorithm, setTrainingAlgorithm] = useState<string>("LDA");
   const [featureGroup, setFeatureGroup] = useState<string>("HTD");
   const [numSets, setNumSets] = useState<number>(3);
-  const [trainingMotions, setTrainingMotions] = useState<string[]>(GESTURE_MOTIONS);
+  const [trainingMotions, setTrainingMotions] = useState<string[]>(GESTURE_MOTIONS.map((motion)=>motion.label));
   const [repDuration, setRepDuration] = useState<number>(5);
   const [samplingFrequency, setSamplingFrequency] = useState<number>(200);
   

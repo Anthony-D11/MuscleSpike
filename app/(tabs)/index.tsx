@@ -28,7 +28,7 @@ const WINDOW_SIZE = 100;
 
 
 export default function DashboardScreen() {
-  
+  const gestureLabels = GESTURE_MOTIONS.map((motion)=>motion.label);
   const { connectedDevice } = useBle();
     
   const channels = Array.from({ length: 8 }).map(() => useSharedValue(new Float32Array(DATA_BUFFER_SIZE)));
@@ -174,7 +174,7 @@ export default function DashboardScreen() {
       if (Array.isArray(rawOutput)) {
         const predictedClassIndex = rawOutput.indexOf(Math.max(...rawOutput));
         
-        setCurrentPrediction(GESTURE_MOTIONS[predictedClassIndex]);
+        setCurrentPrediction(gestureLabels[predictedClassIndex]);
       }
     } catch (e) {
       console.error("Math execution crashed:", e);
