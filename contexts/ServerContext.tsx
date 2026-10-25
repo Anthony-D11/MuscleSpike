@@ -8,7 +8,7 @@ interface ServerContextType {
   isServerReachable: boolean;
   checkServerConnection: () => Promise<void>;
   uploadEMGData: () => Promise<void>;
-  trainAndInstallModel: () => Promise<void>;
+  trainAndInstallModel: (trainingAlgorithm: string, featureGroup: string) => Promise<void>;
 }
 
 const ServerContext = createContext<ServerContextType | null>(null);
@@ -20,9 +20,7 @@ export const ServerProvider = ({ children }: { children: React.ReactNode }) => {
   const [isServerReachable, setIsServerReachable] = useState(false);
 
   let baseServerUrl = process.env.EXPO_PUBLIC_SERVER_URL;
-  if (__DEV__) {
-    baseServerUrl = baseServerUrl + ":5000";
-  }
+  
   useEffect(() => {
     loadModelFromDisk();
   }, []);
@@ -95,12 +93,16 @@ export const ServerProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const trainAndInstallModel = async () => {
+  const trainAndInstallModel = async (trainingAlgorithm: string, featureGroup: string) => {
     try {
       console.log("Fetching new model from server...");
       
       const response = await apiCall<{ model: string }>(baseServerUrl + "/train", {
-        method: "GET",
+        method: "POST",
+        body: {
+          trainingAlgorithm: trainingAlgorithm,
+          featureGroup: featureGroup
+        },
         timeoutMs: 30000,
       });
       if (response.error || !response.data) {

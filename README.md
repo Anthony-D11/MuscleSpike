@@ -63,3 +63,11 @@ Because this app utilizes native Bluetooth modules, it cannot be run inside the 
    ![Training process in progress](demo/training_in_progress_08212026.jpg)
    ![Training process completed](demo/training_completed_08212026.jpg)
    ![File upload to server successfully](demo/file_upload_successful_08212026.jpg)
+
+## Lessons learned
+
+- **Server is not reachable (Request timed out locally):** Windows Defender Firewall is blocking requests from mobile application to the server running locally. This can be SOLVED by running this to tunnel the connection directly through the cable:
+
+```bash
+adb reverse tcp:5000 tcp:5000
+```

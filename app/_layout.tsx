@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+import { AppConfigProvider } from '@/contexts/AppConfigContext';
 import { ServerProvider } from '@/contexts/ServerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { BleProvider } from '../contexts/BleContext';
@@ -26,10 +27,12 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <BleProvider>
         <ServerProvider>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          </Stack>
+          <AppConfigProvider>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+            </Stack>
+          </AppConfigProvider>
         </ServerProvider>
         <StatusBar style="auto" />
       </BleProvider>

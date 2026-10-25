@@ -1,6 +1,8 @@
 import BarEMGChart from '@/components/BarEMGChart';
 import RadialEMGChart from '@/components/RadialEMGChart';
 import RawEMGChart from '@/components/RawEMGChart';
+import { GESTURE_MOTIONS } from '@/constants/app-config';
+import { CommonStyles, Palette } from '@/constants/shared-styles';
 import { useBle } from '@/contexts/BleContext';
 import { useModel } from '@/contexts/ServerContext';
 import { ExtractFeatures } from '@/utils/FeatureExtractor';
@@ -10,10 +12,10 @@ import { useIsFocused } from '@react-navigation/native';
 import { Buffer } from 'buffer';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import React, { useEffect, useRef, useState } from 'react';
-import { Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
+import { Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnUI } from 'react-native-worklets';
 
 if (typeof global.Buffer === 'undefined') {
@@ -23,7 +25,6 @@ if (typeof global.Buffer === 'undefined') {
 const DATA_BUFFER_SIZE = 400;
 const STRIDE = 20;
 const WINDOW_SIZE = 100; 
-const GESTURES = ['No Movement', 'Hand Open', 'Hand Close', 'Supination', 'Pronation'];
 
 
 export default function DashboardScreen() {
@@ -173,7 +174,7 @@ export default function DashboardScreen() {
       if (Array.isArray(rawOutput)) {
         const predictedClassIndex = rawOutput.indexOf(Math.max(...rawOutput));
         
-        setCurrentPrediction(GESTURES[predictedClassIndex]);
+        setCurrentPrediction(GESTURE_MOTIONS[predictedClassIndex]);
       }
     } catch (e) {
       console.error("Math execution crashed:", e);
@@ -281,161 +282,137 @@ export default function DashboardScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <ScrollView 
-        style={styles.scrollContainer} 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <StatusBar barStyle="light-content" backgroundColor="#121212" />
-        {/* Header Section */}
-        <View style={styles.headerContainer}>
-          <View style={styles.headerLeft}>
-            <MaterialCommunityIcons name="antenna" size={24} color="#1E3A8A" />
-            <Text style={styles.headerTitle}>Muscle Spike</Text>
-          </View>
-        </View>
-        {/* Status Cards Section */}
-        <View style={styles.statusRow}>
-          {/* Bluetooth Card */}
-          <View style={styles.statusCard}>
-            <View style={styles.statusIndicatorContainer}>
-              <View style={[
-                styles.indicatorLine,
-                connectedDevice !== null ? {backgroundColor: '#10B981'} : {backgroundColor: '#ba1a1a'}
-              ]} />
-            </View>
-            <View style={styles.statusTextContainer}>
-              <Text style={styles.statusLabel}>BLUETOOTH</Text>
-              <Text style={styles.statusValue}>{connectedDevice !== null ? 'Connected' : 'Disconnected'}</Text>
-            </View>
-            <Ionicons name="bluetooth" size={20} color="#475569" />
-          </View>
-          {/* Server Card */}
-          <View style={styles.statusCard}>
-            <View style={styles.statusIndicatorContainer}>
-              <View style={[
-                styles.indicatorDot,
-                isServerReachable ? {backgroundColor: '#10B981'} : {backgroundColor: '#ba1a1a'}
-              ]} />
-            </View>
-            <View style={styles.statusTextContainer}>
-              <Text style={styles.statusLabel}>SERVER</Text>
-              <Text style={styles.statusValue}>{isServerReachable ? "Online" : "Offline"}</Text>
-            </View>
-            <Ionicons name="cloud-done-outline" size={20} color="#475569" />
-          </View>
-        </View>
-        {/* Prediction Section */}
-        <View style={styles.contentSection}>
-          <Text style={styles.title}>Current Gesture:</Text>
-          <Text style={styles.subtitle}>{currentPrediction}</Text>
-        </View>
-        {/* Container for the cards and the overlaying Canvas */}
-        <View style={styles.telemetryContainer}>
-          <View style={styles.cardContainer}>
-            <View style={styles.cardHeader}>
-              <TouchableOpacity style={styles.settingsButton} onPress={() => setIsSettingDialogVisible(true)}>
-                <Ionicons name="settings-outline" size={25} color="black" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.settingsButton} onPress={openFullscreenChart}>
-                <Ionicons name="resize-outline" size={25} color="black" />
-              </TouchableOpacity>
-            </View>
-          </View>
-          {renderChart()}
-        </View>
-        {/* Settings Modal */}
-        <Modal
-          visible={isSettingDialogVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setIsSettingDialogVisible(false)}
+    <SafeAreaProvider>
+      <SafeAreaView style={CommonStyles.safeArea}>
+        <ScrollView 
+          style={styles.scrollContainer} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={CommonStyles.scrollContent}
         >
-          {/* Dark overlay background */}
-          <View style={styles.modalOverlay}>
-            {/* Dialog Box */}
-            <View style={styles.dialogBox}>
-              {renderChartSettingsBody(() => setIsSettingDialogVisible(false))}
+          <StatusBar barStyle="light-content" backgroundColor="#121212" />
+          {/* Header Section */}
+          <View style={CommonStyles.headerContainer}>
+            <View style={CommonStyles.headerLeft}>
+              <MaterialCommunityIcons name="antenna" size={24} color="#1E3A8A" />
+              <Text style={CommonStyles.headerTitle}>Muscle Spike</Text>
             </View>
           </View>
-        </Modal>
-        {/* Fullscreen Landscape Chart Dialog */}
-        <Modal
-          visible={isFullscreenChartVisible}
-          animationType="fade"
-          onRequestClose={closeFullscreenChart}
-        >
-          <SafeAreaView style={styles.fullscreenContainer} edges={['top', 'bottom', 'left', 'right']}>
-            <View style={styles.fullscreenChartCard}>
-              {/* Controls row (above the chart) */}
-              <View style={styles.fullscreenControls}>
-                <TouchableOpacity
-                  style={styles.settingsButton}
-                  onPress={() => setIsFullscreenSettingsVisible(true)}
-                >
+          {/* Status Cards Section */}
+          <View style={styles.statusRow}>
+            {/* Bluetooth Card */}
+            <View style={styles.statusCard}>
+              <View style={styles.statusIndicatorContainer}>
+                <View style={[
+                  styles.indicatorLine,
+                  connectedDevice !== null ? {backgroundColor: '#10B981'} : {backgroundColor: '#ba1a1a'}
+                ]} />
+              </View>
+              <View style={styles.statusTextContainer}>
+                <Text style={styles.statusLabel}>BLUETOOTH</Text>
+                <Text style={styles.statusValue}>{connectedDevice !== null ? 'Connected' : 'Disconnected'}</Text>
+              </View>
+              <Ionicons name="bluetooth" size={20} color="#475569" />
+            </View>
+            {/* Server Card */}
+            <View style={styles.statusCard}>
+              <View style={styles.statusIndicatorContainer}>
+                <View style={[
+                  styles.indicatorDot,
+                  isServerReachable ? {backgroundColor: '#10B981'} : {backgroundColor: '#ba1a1a'}
+                ]} />
+              </View>
+              <View style={styles.statusTextContainer}>
+                <Text style={styles.statusLabel}>SERVER</Text>
+                <Text style={styles.statusValue}>{isServerReachable ? "Online" : "Offline"}</Text>
+              </View>
+              <Ionicons name="cloud-done-outline" size={20} color="#475569" />
+            </View>
+          </View>
+          {/* Prediction Section */}
+          <View style={styles.contentSection}>
+            <Text style={styles.title}>Current Gesture:</Text>
+            <Text style={styles.subtitle}>{currentPrediction}</Text>
+          </View>
+          {/* Container for the cards and the overlaying Canvas */}
+          <View style={styles.telemetryContainer}>
+            <View style={[CommonStyles.card, styles.cardContainer]}>
+              <View style={styles.cardHeader}>
+                <TouchableOpacity style={styles.settingsButton} onPress={() => setIsSettingDialogVisible(true)}>
                   <Ionicons name="settings-outline" size={25} color="black" />
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.settingsButton}
-                  onPress={closeFullscreenChart}
-                >
-                  <Ionicons name="contract-outline" size={25} color="black" />
+                <TouchableOpacity style={styles.settingsButton} onPress={openFullscreenChart}>
+                  <Ionicons name="resize-outline" size={25} color="black" />
                 </TouchableOpacity>
               </View>
-              <View style={styles.fullscreenChartArea} onLayout={handleFullscreenCardLayout}>
-                {chartCardSize.width > 0 && chartCardSize.height > 0 && renderChart(chartCardSize)}
+            </View>
+            {renderChart()}
+          </View>
+          {/* Settings Modal */}
+          <Modal
+            visible={isSettingDialogVisible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setIsSettingDialogVisible(false)}
+          >
+            {/* Dark overlay background */}
+            <View style={styles.modalOverlay}>
+              {/* Dialog Box */}
+              <View style={[CommonStyles.card, styles.dialogBox]}>
+                {renderChartSettingsBody(() => setIsSettingDialogVisible(false))}
               </View>
             </View>
-          </SafeAreaView>
-        </Modal>
-        {/* Fullscreen Chart Settings Popup */}
-        <Modal
-          visible={isFullscreenSettingsVisible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setIsFullscreenSettingsVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.dialogBox, styles.fullscreenDialogBox]}>
-              {renderChartSettingsBody(() => setIsFullscreenSettingsVisible(false))}
+          </Modal>
+          {/* Fullscreen Landscape Chart Dialog */}
+          <Modal
+            visible={isFullscreenChartVisible}
+            animationType="fade"
+            onRequestClose={closeFullscreenChart}
+          >
+            <SafeAreaView style={styles.fullscreenContainer} edges={['top', 'bottom', 'left', 'right']}>
+              <View style={styles.fullscreenChartCard}>
+                {/* Controls row (above the chart) */}
+                <View style={styles.fullscreenControls}>
+                  <TouchableOpacity
+                    style={styles.settingsButton}
+                    onPress={() => setIsFullscreenSettingsVisible(true)}
+                  >
+                    <Ionicons name="settings-outline" size={25} color="black" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.settingsButton}
+                    onPress={closeFullscreenChart}
+                  >
+                    <Ionicons name="contract-outline" size={25} color="black" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.fullscreenChartArea} onLayout={handleFullscreenCardLayout}>
+                  {chartCardSize.width > 0 && chartCardSize.height > 0 && renderChart(chartCardSize)}
+                </View>
+              </View>
+            </SafeAreaView>
+          </Modal>
+          {/* Fullscreen Chart Settings Popup */}
+          <Modal
+            visible={isFullscreenSettingsVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setIsFullscreenSettingsVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={[CommonStyles.card, styles.dialogBox, styles.fullscreenDialogBox]}>
+                {renderChartSettingsBody(() => setIsFullscreenSettingsVisible(false))}
+              </View>
             </View>
-          </View>
-        </Modal>
-      </ScrollView>
-    </SafeAreaView>
+          </Modal>
+        </ScrollView>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { 
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
   scrollContainer: {
     flex: 1,
-  },
-  scrollContent: {
-    padding: 10,
-    paddingBottom: 20,
-  },
-  /* Header Styles */
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-    marginTop: 10,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0066CC',
   },
   /* Status Cards Styles */
   statusRow: {
@@ -490,43 +467,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
   },
-  /* Hero Card Styles */
-  heroCard: {
-    backgroundColor: '#2563EB',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 24,
-    overflow: 'hidden',
-  },
-  heroTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 12,
-  },
-  heroDescription: {
-    fontSize: 15,
-    color: '#DBEAFE',
-    lineHeight: 22,
-    marginBottom: 24,
-    paddingRight: 20,
-  },
-  heroButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-    gap: 8,
-  },
-  heroButtonText: {
-    color: '#2563EB',
-    fontSize: 15,
-    fontWeight: '600',
-  },
   contentSection: {
     paddingVertical: 10
   },
@@ -544,17 +484,9 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     height: 550,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
     marginBottom: 12, 
     borderWidth: 1,
     borderColor: '#E2E8F0', 
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
   },
   cardHeader: {
     height: 26,
@@ -564,26 +496,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     gap: 20,
   },
-  indicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#0A58CA',
-    marginRight: 8,
-  },
-  channelText: { 
-    color: '#334155',
-    fontSize: 14, 
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
   settingsButton: {
     
-  },
-  buttonText: {
-    color: '#007AFF', // Primary Blue
-    fontSize: 16,
-    fontWeight: '600',
   },
   
   // Modal Styles
@@ -593,16 +507,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dialogBox: {
-    backgroundColor: '#FFFFFF', // Clean white dialog
-    borderRadius: 12,
     padding: 20,
     paddingBottom: 24,
     margin: 10,
     maxHeight: '85%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
     elevation: 10,
   },
   dialogScroll: {
@@ -642,8 +550,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activeType: {
-    backgroundColor: '#007AFF', // Primary Blue
-    borderColor: '#007AFF',
+    backgroundColor: Palette.PRIMARY, // Primary Blue
+    borderColor: Palette.PRIMARY,
   },
   inactiveText: { color: '#64748B', fontWeight: 'bold' },
   activeText: { color: '#FFFFFF', fontWeight: 'bold' },
@@ -663,19 +571,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipActive: {
-    backgroundColor: 'rgba(0, 122, 255, 0.1)', // Tinted blue background
-    borderColor: '#007AFF',
+    backgroundColor: Palette.CHIP_BG,
+    borderColor: Palette.PRIMARY,
   },
   chipInactive: {
     backgroundColor: '#F8FAFC',
     borderColor: '#E2E8F0',
   },
-  chipTextActive: { color: '#007AFF', fontWeight: 'bold' },
+  chipTextActive: { color: Palette.PRIMARY, fontWeight: 'bold' },
   chipTextInactive: { color: '#64748B' },
 
   // Close Button
   closeButton: {
-    backgroundColor: '#007AFF', // Primary Blue
+    backgroundColor: Palette.PRIMARY, // Primary Blue
     padding: 16,
     borderRadius: 10,
     alignItems: 'center',

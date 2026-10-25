@@ -1,0 +1,95 @@
+import { StyleSheet } from 'react-native';
+
+export const Palette = {
+  PRIMARY: '#0A58CA',
+  HEADER_BLUE: '#0066CC',
+  DARK: '#0F172A',
+  INK: '#1E293B',
+  MUTED: '#64748B',
+  BG: '#F8FAFC',
+  BORDER: '#E2E8F0',
+  CHIP_BG: '#E8F1FF',
+  GREEN: '#059669',
+  GREEN_BG: '#D1FAE5',
+  GREEN_DOT: '#10B981',
+  WHITE: '#FFFFFF',
+} as const;
+
+// Shared layout pieces duplicated across tab screens (header, page, card,
+// section labels, primary button). Screen-specific styles stay local.
+export const CommonStyles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: Palette.BG },
+  scrollContent: { padding: 16, paddingBottom: 48 },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 16,
+  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Palette.HEADER_BLUE,
+  },
+  card: {
+    backgroundColor: Palette.WHITE,
+    borderRadius: 16,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  sectionTitleLg: { fontSize: 18, fontWeight: '800', color: Palette.DARK },
+  sectionTitleSm: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+    letterSpacing: 0.5,
+  },
+  sectionAction: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Palette.PRIMARY,
+    letterSpacing: 0.4,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Palette.MUTED,
+    letterSpacing: 0.6,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Palette.PRIMARY,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  primaryButtonText: {
+    color: Palette.WHITE,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Palette.GREEN_DOT,
+    marginRight: 6,
+  },
+});

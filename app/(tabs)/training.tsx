@@ -1,3 +1,5 @@
+import { CommonStyles } from '@/constants/shared-styles';
+import { useAppConfig } from '@/contexts/AppConfigContext';
 import { useBle } from '@/contexts/BleContext';
 import { useModel } from '@/contexts/ServerContext';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -5,7 +7,6 @@ import { useIsFocused } from '@react-navigation/native';
 import { Buffer } from 'buffer';
 import { File, Paths } from 'expo-file-system';
 import React, { useEffect, useRef, useState } from 'react';
-
 import {
   ActivityIndicator,
   Alert,
@@ -16,18 +17,15 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-const GESTURES = ['No Movement', 'Hand Open', 'Hand Close', 'Supination', 'Pronation'];
-const MAX_TRIALS = 3;
-const RECORD_DURATION_SEC = 5;
-
 export default function RecordingScreen() {
   const { connectedDevice } = useBle();
+  const { numSets, trainingMotions, repDuration, trainingAlgorithm, featureGroup } = useAppConfig();
   const isFocused = useIsFocused();
   
   const [trialId, setTrialId] = useState(1);
   const [gestureId, setGestureId] = useState(0);
   const [status, setStatus] = useState<'IDLE' | 'RECORDING' | 'DONE'>('IDLE');
-  const [timeLeft, setTimeLeft] = useState(RECORD_DURATION_SEC);
+  const [timeLeft, setTimeLeft] = useState(repDuration);
   const [isUploading, setIsUploading] = useState(false);
   const [isTraining, setIsTraining] = useState(false);
 
@@ -36,6 +34,7 @@ export default function RecordingScreen() {
   const activeSubscriptions = useRef<any[]>([]);
   const { uploadEMGData, trainAndInstallModel } = useModel();
   
+  useEffect(() => setTimeLeft(repDuration), [repDuration]);
   useEffect(() => {
     if (!connectedDevice || !isFocused) return;
 
@@ -116,10 +115,10 @@ export default function RecordingScreen() {
   const completeCaptureStep = () => {
     isRecordingRef.current = false;
     saveBufferToCSV();
-    if (gestureId < GESTURES.length - 1) {
+    if (gestureId < trainingMotions.length - 1) {
       setGestureId(prev => prev + 1);
       setStatus('IDLE');
-    } else if (trialId < MAX_TRIALS) {
+    } else if (trialId < numSets) {
       setGestureId(0);
       setTrialId(prev => prev + 1);
       setStatus('IDLE');
@@ -127,7 +126,7 @@ export default function RecordingScreen() {
       setStatus('DONE');
     }
     
-    setTimeLeft(RECORD_DURATION_SEC);
+    setTimeLeft(repDuration);
   };
 
   const saveBufferToCSV = () => {
@@ -155,7 +154,7 @@ export default function RecordingScreen() {
       Alert.alert("Success", `Data files uploaded to server successfully!`);
       setIsUploading(false);
       setIsTraining(true);
-      await trainAndInstallModel();
+      await trainAndInstallModel(trainingAlgorithm, featureGroup);
       setIsTraining(false);
     } catch (e) {
       console.error("Upload error:", e);
@@ -169,29 +168,29 @@ export default function RecordingScreen() {
   const handleResetProtocol = () => {
     setTrialId(1);
     setGestureId(0);
-    setTimeLeft(RECORD_DURATION_SEC);
+    setTimeLeft(repDuration);
     setStatus('IDLE');
   };
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.content}>
+      <SafeAreaView style={CommonStyles.safeArea}>
+        <View style={[CommonStyles.scrollContent, styles.content]}>
           {/* Header Section */}
-          <View style={styles.headerContainer}>
-            <View style={styles.headerLeft}>
+          <View style={CommonStyles.headerContainer}>
+            <View style={CommonStyles.headerLeft}>
               <MaterialCommunityIcons name="antenna" size={24} color="#1E3A8A" />
-              <Text style={styles.headerTitle}>Muscle Spike</Text>
+              <Text style={CommonStyles.headerTitle}>Muscle Spike</Text>
             </View>
           </View>
           {status === 'DONE' ? (
             <View style={styles.doneContainer}>
               <Ionicons name="checkmark-circle" size={80} color="#10B981" />
               <Text style={styles.doneTitle}>Protocol Complete</Text>
-              <Text style={styles.doneSub}>All 3 trials recorded and saved locally.</Text>
+              <Text style={styles.doneSub}>All {numSets} trials recorded and saved locally.</Text>
               
               <TouchableOpacity 
-                style={[styles.uploadButton, (isUploading || isTraining) && styles.uploadButtonDisabled]} 
+                style={[CommonStyles.primaryButton, styles.uploadButton, (isUploading || isTraining) && styles.uploadButtonDisabled]} 
                 onPress={handleServerUpload}
                 disabled={isUploading || isTraining}
               >
@@ -212,14 +211,14 @@ export default function RecordingScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.card}>
+            <View style={[CommonStyles.card, styles.card]}>
               <View style={styles.progressRow}>
-                <Text style={styles.trialText}>TRIAL {trialId} OF {MAX_TRIALS}</Text>
-                <Text style={styles.stepText}>MOTION {gestureId + 1} / 5</Text>
+                <Text style={styles.trialText}>TRIAL {trialId} OF {numSets}</Text>
+                <Text style={styles.stepText}>MOTION {gestureId + 1} / {trainingMotions.length}</Text>
               </View>
 
               <Text style={styles.targetLabel}>TARGET MOTION</Text>
-              <Text style={styles.gestureName}>{GESTURES[gestureId]}</Text>
+              <Text style={styles.gestureName}>{trainingMotions[gestureId]}</Text>
 
               <View style={styles.timerCircle}>
                 <Text style={[styles.timerText, status === 'RECORDING' && styles.timerTextActive]}>
@@ -229,16 +228,16 @@ export default function RecordingScreen() {
 
               {status === 'IDLE' ? (
                 <TouchableOpacity 
-                  style={styles.actionButton} 
+                  style={[CommonStyles.primaryButton, styles.actionButton]} 
                   onPress={() => setStatus('RECORDING')}
                   disabled={!connectedDevice}
                 >
                   <Text style={styles.actionButtonText}>
-                    {connectedDevice ? "Begin 5s Capture" : "Device Disconnected"}
+                    {connectedDevice ? `Begin ${repDuration}s Capture` : "Device Disconnected"}
                   </Text>
                 </TouchableOpacity>
               ) : (
-                <View style={[styles.actionButton, styles.actionButtonActive]}>
+                <View style={[CommonStyles.primaryButton, styles.actionButton, styles.actionButtonActive]}>
                   <ActivityIndicator color="#FFF" />
                   <Text style={[styles.actionButtonText, {marginLeft: 10}]}>Recording...</Text>
                 </View>
@@ -254,37 +253,9 @@ export default function RecordingScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F8FAFC'},
-  container: { 
-    flex: 1, 
-    backgroundColor: '#F8FAFC'
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 60,
-  },
-  /* Header Styles */
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-    marginTop: 10,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0066CC',
-  },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 20, backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
-  content: { flex: 1, justifyContent: 'flex-start', padding: 20 },
+  content: { flex: 1, justifyContent: 'flex-start' },
   
-  card: { backgroundColor: '#FFF', borderRadius: 16, padding: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, alignItems: 'center' },
+  card: { padding: 24, alignItems: 'center' },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 24 },
   trialText: { fontSize: 12, fontWeight: 'bold', color: '#0A58CA', backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 },
   stepText: { fontSize: 12, fontWeight: 'bold', color: '#64748B' },
@@ -296,14 +267,14 @@ const styles = StyleSheet.create({
   timerText: { fontSize: 36, fontWeight: 'bold', color: '#94A3B8' },
   timerTextActive: { color: '#EF4444' },
 
-  actionButton: { width: '100%', backgroundColor: '#0A58CA', padding: 18, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  actionButton: { width: '100%', padding: 18 },
   actionButtonActive: { backgroundColor: '#EF4444' },
   actionButtonText: { fontSize: 16, fontWeight: 'bold', color: '#FFF' },
 
   doneContainer: { alignItems: 'center', justifyContent: 'center' },
   doneTitle: { fontSize: 28, fontWeight: 'bold', color: '#1E293B', marginTop: 16 },
   doneSub: { fontSize: 16, color: '#64748B', marginTop: 8, marginBottom: 32, textAlign: 'center' },
-  uploadButton: { backgroundColor: '#10B981', padding: 18, borderRadius: 12, width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  uploadButton: { backgroundColor: '#10B981', padding: 18, width: '100%' },
   uploadButtonDisabled: { backgroundColor: '#94A3B8' },
   uploadButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
   

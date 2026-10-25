@@ -37,6 +37,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <MaterialCommunityIcons name="dumbbell" size={28} color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="config"
+        options={{
+          title: "Config",
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="tools" size={28} color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
